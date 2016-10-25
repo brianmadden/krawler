@@ -16,21 +16,27 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import com.nhaarman.mockito_kotlin.any
+import com.nhaarman.mockito_kotlin.mock
+import com.nhaarman.mockito_kotlin.verify
 import io.thelandscape.krawler.http.KrawlUrl
-import io.thelandscape.krawler.http.checkUrl
+import io.thelandscape.krawler.http.Requests
+import org.apache.http.client.methods.HttpHead
+import org.apache.http.impl.client.CloseableHttpClient
 import org.jetbrains.spek.api.Spek
 import org.jetbrains.spek.api.dsl.describe
 import org.jetbrains.spek.api.dsl.it
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 
+val mockHttpClient = mock<CloseableHttpClient>()
 
 class RequestsTest: Spek({
     describe("a Request") {
+        val request: Requests = Requests(mockHttpClient)
         val testUrl= KrawlUrl("http://httpbin.org")
+        request.checkUrl(testUrl)
 
-        it("should have a 200 status code") {
-            assertEquals(200, checkUrl(testUrl))
+        it("should call execute once with an HttpHead") {
+            verify(mockHttpClient).execute(HttpHead(testUrl.canonicalForm))
         }
     }
 })

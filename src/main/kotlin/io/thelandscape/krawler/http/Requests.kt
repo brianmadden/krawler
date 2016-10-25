@@ -23,10 +23,14 @@ import org.apache.http.impl.client.HttpClients
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-private val client: CloseableHttpClient = HttpClients.createDefault()
+val Request: Requests = Requests()
 
-fun checkUrl(url: KrawlUrl): Int {
-    val resp: CloseableHttpResponse = client.execute(HttpHead(url.canonicalForm))
-    return resp.statusLine.statusCode
+class Requests(val httpClient: CloseableHttpClient = HttpClients.createDefault()) {
 
+    fun checkUrl(url: KrawlUrl): Int {
+        val head: HttpHead = HttpHead(url.canonicalForm)
+        val resp: CloseableHttpResponse = httpClient.execute(head)
+        return resp.statusLine.statusCode
+
+    }
 }
