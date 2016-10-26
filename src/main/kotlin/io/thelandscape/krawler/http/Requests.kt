@@ -29,8 +29,8 @@ class Requests(val httpClient: CloseableHttpClient = HttpClients.createDefault()
 
     fun checkUrl(url: KrawlUrl): Int {
         val head: HttpHead = HttpHead(url.canonicalForm)
-        val resp: CloseableHttpResponse = httpClient.execute(head)
-        return resp.statusLine.statusCode
+        val resp: CloseableHttpResponse? = httpClient.execute(head)
+        return resp?.statusLine?.statusCode ?: -999
 
     }
 }
