@@ -1,14 +1,5 @@
-package io.thelandscape.krawler.http
-
-import org.apache.http.HttpEntity
-import org.apache.http.client.methods.CloseableHttpResponse
-import org.apache.http.client.methods.HttpGet
-import org.apache.http.client.methods.HttpHead
-import org.apache.http.impl.client.CloseableHttpClient
-import org.apache.http.impl.client.HttpClients
-
 /**
- * Created by @brianmadden on 10/21/16.
+ * Created by brian.a.madden@gmail.com on 10/26/16.
  *
  * Copyright (c) <2016> <H, llc>
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
@@ -24,22 +15,3 @@ import org.apache.http.impl.client.HttpClients
  * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-
-val Request: Requests = Requests()
-
-class Requests(val httpClient: CloseableHttpClient = HttpClients.createDefault()) {
-
-    fun checkUrl(url: KrawlUrl): Int {
-        val head: HttpHead = HttpHead(url.canonicalForm)
-        val resp: CloseableHttpResponse? = httpClient.execute(head)
-        return resp?.statusLine?.statusCode ?: -999
-
-    }
-
-    fun getUrl(url: KrawlUrl): KrawlDocument {
-        val httpGet: HttpGet = HttpGet(url.canonicalForm)
-        val resp: CloseableHttpResponse? = httpClient.execute(httpGet)
-
-        return KrawlDocument(resp)
-    }
-}

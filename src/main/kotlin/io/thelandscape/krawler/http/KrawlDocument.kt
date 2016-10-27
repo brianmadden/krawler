@@ -1,14 +1,10 @@
 package io.thelandscape.krawler.http
 
-import org.apache.http.HttpEntity
 import org.apache.http.client.methods.CloseableHttpResponse
-import org.apache.http.client.methods.HttpGet
-import org.apache.http.client.methods.HttpHead
-import org.apache.http.impl.client.CloseableHttpClient
-import org.apache.http.impl.client.HttpClients
+import org.apache.http.util.EntityUtils
 
 /**
- * Created by @brianmadden on 10/21/16.
+ * Created by brian.a.madden@gmail.com on 10/26/16.
  *
  * Copyright (c) <2016> <H, llc>
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
@@ -25,21 +21,25 @@ import org.apache.http.impl.client.HttpClients
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-val Request: Requests = Requests()
+class KrawlDocument(private val response: CloseableHttpResponse) {
 
-class Requests(val httpClient: CloseableHttpClient = HttpClients.createDefault()) {
+    /**
+     * Http headers
+     */
+    val headers: Map<String, String>
+        get() = response.allHeaders.associate { it.name to it.value }
 
-    fun checkUrl(url: KrawlUrl): Int {
-        val head: HttpHead = HttpHead(url.canonicalForm)
-        val resp: CloseableHttpResponse? = httpClient.execute(head)
-        return resp?.statusLine?.statusCode ?: -999
+    /**
+     * Raw HTML
+     */
+    val rawHtml: String
+        get() = EntityUtils.toString(response.entity)
 
-    }
 
-    fun getUrl(url: KrawlUrl): KrawlDocument {
-        val httpGet: HttpGet = HttpGet(url.canonicalForm)
-        val resp: CloseableHttpResponse? = httpClient.execute(httpGet)
+    /**
+     * Status code
+     */
+    val statusCode: Int
+        get() = response.statusLine.statusCode
 
-        return KrawlDocument(resp)
-    }
 }
