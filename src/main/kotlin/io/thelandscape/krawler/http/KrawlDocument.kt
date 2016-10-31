@@ -1,6 +1,6 @@
 package io.thelandscape.krawler.http
 
-import org.apache.http.client.methods.CloseableHttpResponse
+import org.apache.http.HttpResponse
 import org.apache.http.util.EntityUtils
 
 /**
@@ -21,7 +21,7 @@ import org.apache.http.util.EntityUtils
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-class KrawlDocument(private val response: CloseableHttpResponse) {
+class KrawlDocument(private val response: HttpResponse) {
 
     /**
      * Http headers
@@ -33,7 +33,7 @@ class KrawlDocument(private val response: CloseableHttpResponse) {
      * Raw HTML
      */
     val rawHtml: String
-        get() = EntityUtils.toString(response.entity)
+        get() = if (response.entity != null) EntityUtils.toString(response.entity) else ""
 
 
     /**

@@ -18,26 +18,39 @@
 
 import com.nhaarman.mockito_kotlin.any
 import com.nhaarman.mockito_kotlin.mock
+import com.nhaarman.mockito_kotlin.times
 import com.nhaarman.mockito_kotlin.verify
+import io.thelandscape.krawler.http.ContentFetchError
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.Requests
-import org.apache.http.client.methods.HttpHead
 import org.apache.http.impl.client.CloseableHttpClient
-import org.jetbrains.spek.api.Spek
-import org.jetbrains.spek.api.dsl.describe
-import org.jetbrains.spek.api.dsl.it
+import org.junit.Test
 
-val mockHttpClient = mock<CloseableHttpClient> {}
+private val mockHttpClient = mock<CloseableHttpClient> {}
 
-class RequestsTest: Spek({
-    describe("a Request") {
-        val request: Requests = Requests(mockHttpClient)
-        val testUrl = KrawlUrl("http://httpbin.org")
-        request.checkUrl(testUrl)
+class RequestsTest {
 
-        it("should call execute once with an HttpHead") {
-            // TODO: Swap the any() call to HttpHead somehow
-            verify(mockHttpClient).execute(any())
+    val request: Requests = Requests(mockHttpClient)
+    val testUrl = KrawlUrl("http://httpbin.org")
+
+    @Test fun testRequestCheck() {
+        try {
+            request.checkUrl(testUrl)
+        } catch (e: ContentFetchError) {
+            // Ignore this, it's expected
         }
+        // it should call execute once with an HttpHead
+        // TODO: Swap the any() call to HttpHead somehow
+        verify(mockHttpClient, times(1)).execute(any())
     }
-})
+
+    @Test fun testRequestGet() {
+        try {
+            request.getUrl(testUrl)
+        } catch (e: ContentFetchError) {
+            // Ignore this, it's expected
+        }
+        verify(mockHttpClient, times(2)).execute(any())
+    }
+
+}

@@ -1,7 +1,5 @@
 import io.thelandscape.krawler.http.KrawlUrl
-import org.jetbrains.spek.api.Spek
-import org.jetbrains.spek.api.dsl.describe
-import org.jetbrains.spek.api.dsl.it
+import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
@@ -23,17 +21,17 @@ import kotlin.test.assertFalse
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-class KrawlUrlTest: Spek({
-    describe("a KrawlUrl") {
-        val testUrl = KrawlUrl("http://www.abc.com/./")
+class KrawlUrlTest {
 
-        it("should have a canonical and normal form that are equal") {
-            assertEquals(testUrl.canonicalForm, testUrl.normalForm)
-        }
+    val testUrl = KrawlUrl("http://www.abc.com/./")
 
-        it("should have no /./ in normalized form") {
-            assertFalse(testUrl.normalForm.contains("///.//"))
-        }
-
+    // it should have a canonical and normal form that are equal
+    @Test fun normalFormIsCanonicalForm() {
+        assertEquals(testUrl.canonicalForm, testUrl.normalForm)
     }
-})
+
+    @Test fun testNormalForm() {
+        // it should have no /./ in normalized form
+        assertFalse(testUrl.normalForm.contains("///.//"))
+    }
+}

@@ -1,9 +1,9 @@
 package io.thelandscape.krawler.http
 
-import org.apache.http.HttpEntity
-import org.apache.http.client.methods.CloseableHttpResponse
+import org.apache.http.HttpResponse
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.client.methods.HttpHead
+import org.apache.http.client.methods.HttpUriRequest
 import org.apache.http.impl.client.CloseableHttpClient
 import org.apache.http.impl.client.HttpClients
 
@@ -29,17 +29,26 @@ val Request: Requests = Requests()
 
 class Requests(val httpClient: CloseableHttpClient = HttpClients.createDefault()) {
 
-    fun checkUrl(url: KrawlUrl): Int {
-        val head: HttpHead = HttpHead(url.canonicalForm)
-        val resp: CloseableHttpResponse? = httpClient.execute(head)
-        return resp?.statusLine?.statusCode ?: -999
+    fun checkUrl(url: KrawlUrl): Int = requestAndClose(url, ::HttpHead, ::KrawlDocument).statusCode
 
-    }
+    fun getUrl(url: KrawlUrl): KrawlDocument = requestAndClose(url, ::HttpGet, ::KrawlDocument)
 
-    fun getUrl(url: KrawlUrl): KrawlDocument {
-        val httpGet: HttpGet = HttpGet(url.canonicalForm)
-        val resp: CloseableHttpResponse? = httpClient.execute(httpGet)
+    private fun <T> requestAndClose(url: KrawlUrl,
+                                    reqFun: (String) -> HttpUriRequest,
+                                    retFun: (HttpResponse) -> T): T {
 
-        return KrawlDocument(resp)
+        val req: HttpUriRequest = reqFun(url.canonicalForm)
+        val resp: T = try {
+            val response: HttpResponse = httpClient.execute(req)
+            retFun(response)
+        } catch (e: Exception) {
+            throw ContentFetchError(url, e)
+        } finally {
+            httpClient.close()
+        }
+        return resp
     }
 }
+
+class ContentFetchError(url: KrawlUrl, cause: Throwable):
+        Throwable("Failed to retrieve the content for ${url.canonicalForm}.", cause)

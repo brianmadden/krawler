@@ -1,3 +1,13 @@
+import io.thelandscape.krawler.http.KrawlDocument
+import org.apache.http.HttpResponse
+import org.apache.http.ProtocolVersion
+import org.apache.http.entity.StringEntity
+import org.apache.http.message.BasicHttpResponse
+import org.apache.http.message.BasicStatusLine
+import org.junit.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
 /**
  * Created by brian.a.madden@gmail.com on 10/26/16.
  *
@@ -15,3 +25,44 @@
  * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+
+private fun prepareResponse(expectedResponseCode: Int, responseBody: String): HttpResponse {
+    val ret = BasicHttpResponse(
+            BasicStatusLine(
+                    ProtocolVersion("HTTP", 1, 1),
+                    expectedResponseCode,
+                    "")
+    )
+    ret.setStatusCode(expectedResponseCode)
+    ret.entity = StringEntity(responseBody)
+
+    return ret
+}
+
+private val mockReturn = prepareResponse(200, "")
+
+
+class CrawlDocumentTest {
+
+    val doc: KrawlDocument = KrawlDocument(mockReturn)
+
+    // Doc should have a headers property
+    @Test fun testHeadersProperty() {
+        // Headers should be a map
+        assertTrue { doc.headers is Map<String, String> }
+        // Headers should be empty
+        assertTrue { doc.headers.isEmpty() }
+    }
+
+    // it should have a rawHtml element
+    @Test fun testRawHtmlProperty() {
+        assertTrue { doc.rawHtml.isEmpty() }
+    }
+
+
+    // it should have a status code of 200
+    @Test fun testStatusCode() {
+        assertEquals(200, doc.statusCode)
+    }
+
+}
