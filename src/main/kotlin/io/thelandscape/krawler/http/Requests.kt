@@ -29,10 +29,25 @@ val Request: Requests = Requests()
 
 class Requests(val httpClient: CloseableHttpClient = HttpClients.createDefault()) {
 
+    /** Check a URL and return it's status code
+     * @param url KrawlUrl: the url to check
+     *
+     * @return Int: the status code returned by the HttpHead request
+     */
     fun checkUrl(url: KrawlUrl): Int = requestAndClose(url, ::HttpHead, ::KrawlDocument).statusCode
 
+    /** Get the contents of a URL
+     * @param url KrawlUrl: the URL to get the contents of
+     *
+     * @return KrawlDocument: The parsed HttpResponse returned by the GET request
+     */
     fun getUrl(url: KrawlUrl): KrawlDocument = requestAndClose(url, ::HttpGet, ::KrawlDocument)
 
+    /** Convenience function for building, issuing, and closing the HttpRequest
+     * @param url KrawlUrl: Url to make request to
+     * @param reqFun: Function used to construct the request
+     * @param retFun: Function used to construct the response object
+     */
     private fun <T> requestAndClose(url: KrawlUrl,
                                     reqFun: (String) -> HttpUriRequest,
                                     retFun: (HttpResponse) -> T): T {
@@ -50,5 +65,8 @@ class Requests(val httpClient: CloseableHttpClient = HttpClients.createDefault()
     }
 }
 
+/** Error representing any failure to fetch content.
+ * Will contain the root cause as well as the requested URL.
+ */
 class ContentFetchError(url: KrawlUrl, cause: Throwable):
         Throwable("Failed to retrieve the content for ${url.canonicalForm}.", cause)
