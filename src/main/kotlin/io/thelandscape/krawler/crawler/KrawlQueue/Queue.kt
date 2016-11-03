@@ -1,11 +1,5 @@
 package io.thelandscape.krawler.crawler.KrawlQueue
 
-import com.github.andrewoma.kwery.core.DefaultSession
-import com.github.andrewoma.kwery.core.Session
-import com.github.andrewoma.kwery.core.dialect.HsqlDialect
-import com.mchange.v2.c3p0.ComboPooledDataSource
-import java.time.LocalDateTime
-
 /**
  * Created by brian.a.madden@gmail.com on 11/1/16.
  *
@@ -30,35 +24,19 @@ import java.time.LocalDateTime
  */
 interface KrawlQueueIf {
 
-    fun pop(n: Int = 1): List<QueueEntry>
+    fun pop (n: Int = 1): List<QueueEntry>
+    fun push (urls: List<QueueEntry>)
 }
 
-/**
- * HSQL backed KrawlQueue
- */
 
-private class HSQLConnection(fileBacked: Boolean, fileName: String = ".krawl_tmp") {
-    val cpds: ComboPooledDataSource = ComboPooledDataSource()
-
-    init {
-        if (fileBacked)
-            cpds.jdbcUrl = "jdbc:hsqldb:file:$fileName"
-        else
-            cpds.jdbcUrl = "jdbc:hsqldb:mem:${LocalDateTime.now().hashCode()}"
-        cpds.user = ""
-        cpds.password = ""
-        cpds.maxConnectionAge = 600
-        cpds.isTestConnectionOnCheckin = true
-        cpds.idleConnectionTestPeriod = 500
-    }
-}
-
-private val session: Session = DefaultSession(connection, HsqlDialect()) // Standard JDBC connection
-
-class HSQLKrawlQueue(private val queueDao: KrawlQueueIf = KrawlQueueHSQLDao()): KrawlQueueIf {
+class HSQLKrawlQueue(private val queueDao: KrawlQueueIf = KrawlQueueDao): KrawlQueueIf {
 
     override fun pop(n: Int): List<QueueEntry> {
         return queueDao.pop()
+    }
+
+    override fun push(urls: List<QueueEntry>) {
+        throw UnsupportedOperationException("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
 }
