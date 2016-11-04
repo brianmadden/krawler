@@ -25,18 +25,18 @@ package io.thelandscape.krawler.crawler.KrawlQueue
 interface KrawlQueueIf {
 
     fun pop (n: Int = 1): List<QueueEntry>
-    fun push (urls: List<QueueEntry>)
+    fun push (urls: List<QueueEntry>): List<Pair<Int, QueueEntry>>
 }
 
 
-class HSQLKrawlQueue(private val queueDao: KrawlQueueIf = KrawlQueueDao): KrawlQueueIf {
+class KrawlQueue(private val queueDao: KrawlQueueIf = KrawlQueueDao): KrawlQueueIf {
 
     override fun pop(n: Int): List<QueueEntry> {
         return queueDao.pop()
     }
 
-    override fun push(urls: List<QueueEntry>) {
-        throw UnsupportedOperationException("not implemented") //To change body of created functions use File | Settings | File Templates.
+    override fun push(urls: List<QueueEntry>): List<Pair<Int, QueueEntry>> {
+        return queueDao.push(urls)
     }
 
 }

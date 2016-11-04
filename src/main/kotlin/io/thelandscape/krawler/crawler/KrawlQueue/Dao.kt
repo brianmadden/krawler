@@ -1,6 +1,5 @@
 package io.thelandscape.krawler.crawler.KrawlQueue
 
-import com.github.andrewoma.kwery.core.DefaultSession
 import com.github.andrewoma.kwery.core.Session
 import com.github.andrewoma.kwery.core.ThreadLocalSession
 import com.github.andrewoma.kwery.core.dialect.HsqlDialect
@@ -71,5 +70,15 @@ class KrawlQueueHSQLDao(session: Session):
         val params = mapOf("n" to n)
 
         return session.select(sql, params, options("popMinDepth"), table.rowMapper())
+    }
+
+    override fun push(urls: List<QueueEntry>): List<Pair<Int, QueueEntry>> {
+        val sql: String = "INSERT INTO ${table.name} ($columns) VALUES(:url, :depth, :ts)"
+        val values: List<Map<String, Any>> = urls.map {
+            mapOf("url" to it.url,
+                    "depth" to it.depth,
+                    "ts" to it.timestamp)
+        }
+        return session.batchInsert(sql, values, f = table.rowMapper())
     }
 }
