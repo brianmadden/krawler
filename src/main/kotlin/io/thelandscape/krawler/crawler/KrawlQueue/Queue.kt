@@ -25,7 +25,7 @@ package io.thelandscape.krawler.crawler.KrawlQueue
 interface KrawlQueueIf {
 
     fun pop (n: Int = 1): List<QueueEntry>
-    fun push (urls: List<QueueEntry>): List<Pair<Int, QueueEntry>>
+    fun push (urls: List<QueueEntry>): List<QueueEntry>
 }
 
 
@@ -35,7 +35,7 @@ class KrawlQueue(private val queueDao: KrawlQueueIf = KrawlQueueDao): KrawlQueue
         return queueDao.pop()
     }
 
-    override fun push(urls: List<QueueEntry>): List<Pair<Int, QueueEntry>> {
+    override fun push(urls: List<QueueEntry>): List<QueueEntry> {
         return queueDao.push(urls)
     }
 

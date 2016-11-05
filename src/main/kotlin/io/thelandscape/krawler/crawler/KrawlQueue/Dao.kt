@@ -66,19 +66,20 @@ class KrawlQueueHSQLDao(session: Session):
         KrawlQueueIf, AbstractDao<QueueEntry, String>(session, krawlQueueTable, QueueEntry::url) {
 
     override fun pop(n: Int): List<QueueEntry> {
-        val sql = "SELECT $columns FROM ${table.name} WHERE depth = MIN(depth) LIMIT :n"
+
+        val selectSql = "SELECT TOP :n $columns FROM ${table.name}"
         val params = mapOf("n" to n)
 
-        return session.select(sql, params, options("popMinDepth"), table.rowMapper())
+        var out: List<QueueEntry> = listOf()
+        session.transaction {
+            out = session.select(selectSql, params, options("popMinDepth"), table.rowMapper())
+            session.update("DELETE FROM ${table.name} WHERE 1 = 1 LIMIT $n")
+        }
+
+        return out
     }
 
-    override fun push(urls: List<QueueEntry>): List<Pair<Int, QueueEntry>> {
-        val sql: String = "INSERT INTO ${table.name} ($columns) VALUES(:url, :depth, :ts)"
-        val values: List<Map<String, Any>> = urls.map {
-            mapOf("url" to it.url,
-                    "depth" to it.depth,
-                    "ts" to it.timestamp)
-        }
-        return session.batchInsert(sql, values, f = table.rowMapper())
+    override fun push(urls: List<QueueEntry>): List<QueueEntry> {
+        return this.batchInsert(urls)
     }
 }
