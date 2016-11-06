@@ -1,6 +1,7 @@
 package io.thelandscape.krawler.http
 
 import java.net.URI
+import java.net.URL
 
 /**
  * Created by @brianmadden on 10/21/16.
@@ -24,18 +25,31 @@ class KrawlUrl(url: String) {
 
     val rawUrl: String = url
     private val uri: URI = URI(rawUrl)
+    private val url: URL = uri.toURL()
+
+    // It is HTTP if it is -NOT- opaque and
+    val isHttp: Boolean = !uri.isOpaque &&
+            // it is not absolute OR it is absolute and it's scheme is http or https
+            (!uri.isAbsolute || (uri.isAbsolute && (uri.scheme != "http" || uri.scheme != "https")))
 
     val canonicalForm: String
-    // TODO: Consider adding trailing if it doesn't already exist
-        get() { return normalForm }
-
-    val normalForm: String
-        get() {
-            return uri.normalize().toASCIIString()
+        get() = if (uri.isOpaque) normalForm else {
+            if (normalForm.endsWith("/"))
+                normalForm
+            else
+                normalForm + "/"
         }
 
-    override fun toString(): String {
-        return canonicalForm
-    }
+    val normalForm: String
+        get() = uri.normalize().toASCIIString()
+
+    val domain: String
+        get() {
+            val x = uri.toURL()
+            val host: String = uri.host
+            return x.host
+        }
+
+    override fun toString(): String = canonicalForm
 
 }

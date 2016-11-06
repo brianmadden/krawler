@@ -2,6 +2,7 @@ import io.thelandscape.krawler.http.KrawlUrl
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * Created by brian.a.madden@gmail.com on 10/21/16.
@@ -25,6 +26,21 @@ class KrawlUrlTest {
 
     val testUrl = KrawlUrl("http://www.abc.com/./")
 
+    @Test fun testIsHttp() {
+        // Verify that an absolute URL with http & https isHttp returns true
+        val absoluteHttp = KrawlUrl("http://www.abc.com")
+        val absoluteHttps = KrawlUrl("https://www.abc.com")
+        assertTrue { absoluteHttp.isHttp && absoluteHttps.isHttp }
+
+        // Verify that absolute URLs with a scheme other than http isHttp returns false
+        val absoluteNonHttp = KrawlUrl("file://abc/def")
+        assertFalse { absoluteNonHttp.isHttp }
+
+        // Verify that an opaque URI isHttp returns false
+        val opaqueUri = KrawlUrl("mailto:abc@abc.com")
+        assertFalse { opaqueUri.isHttp }
+    }
+
     // it should have a canonical and normal form that are equal
     @Test fun normalFormIsCanonicalForm() {
         assertEquals(testUrl.canonicalForm, testUrl.normalForm)
@@ -33,5 +49,9 @@ class KrawlUrlTest {
     @Test fun testNormalForm() {
         // it should have no /./ in normalized form
         assertFalse(testUrl.normalForm.contains("///.//"))
+    }
+
+    @Test fun testDomain() {
+        assertEquals("abc.com", testUrl.domain)
     }
 }

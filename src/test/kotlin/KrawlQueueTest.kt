@@ -19,7 +19,12 @@
 import com.github.andrewoma.kwery.core.DefaultSession
 import com.github.andrewoma.kwery.core.Session
 import com.github.andrewoma.kwery.core.dialect.HsqlDialect
+import com.nhaarman.mockito_kotlin.mock
+import com.nhaarman.mockito_kotlin.times
+import com.nhaarman.mockito_kotlin.verify
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueue
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueHSQLDao
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
 import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
 import org.junit.After
 import org.junit.Before
@@ -29,8 +34,32 @@ import java.sql.DriverManager
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-// Dao tests
+// KrawlQueue test
+class KrawlQueueTest {
 
+    val krawlQueueDao: KrawlQueueIf = mock()
+    val krawlQueue: KrawlQueue = KrawlQueue(krawlQueueDao)
+
+    @Test fun pushTest() {
+        val urls = listOf(
+                QueueEntry("http://www.a.com", 0),
+                QueueEntry("http://www.b.com", 0)
+        )
+        krawlQueue.push(urls)
+
+        verify(krawlQueueDao, times(1)).push(urls)
+    }
+
+    @Test fun popTest() {
+        val numToPop: Int = 3
+        krawlQueue.pop(numToPop)
+
+        verify(krawlQueueDao, times(1)).pop(numToPop)
+    }
+}
+
+
+// Dao tests
 class KrawlQueueHSQLDaoTest {
 
     val connection: Connection = DriverManager.getConnection("jdbc:hsqldb:mem:testdb", "SA", "")
@@ -69,6 +98,7 @@ class KrawlQueueHSQLDaoTest {
         assertTrue { popped.isNotEmpty() }
         assertEquals("http://www.x.com", popped[0].url)
         assertEquals("http://www.y.com", popped[1].url)
+        assertEquals("http://www.z.com", popped[2].url)
         assertEquals(0, dao.pop().size)
 
         dao.push(list)

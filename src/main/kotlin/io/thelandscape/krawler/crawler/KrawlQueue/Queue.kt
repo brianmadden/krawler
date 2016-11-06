@@ -28,11 +28,14 @@ interface KrawlQueueIf {
     fun push (urls: List<QueueEntry>): List<QueueEntry>
 }
 
-
 class KrawlQueue(private val queueDao: KrawlQueueIf = KrawlQueueDao): KrawlQueueIf {
 
+    fun pop(): QueueEntry? {
+        return queueDao.pop().firstOrNull()
+    }
+
     override fun pop(n: Int): List<QueueEntry> {
-        return queueDao.pop()
+        return queueDao.pop(n)
     }
 
     override fun push(urls: List<QueueEntry>): List<QueueEntry> {

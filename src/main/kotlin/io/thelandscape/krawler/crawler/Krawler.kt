@@ -1,8 +1,12 @@
 package io.thelandscape.krawler.crawler
 
+import com.sun.org.apache.xpath.internal.operations.Bool
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueue
+import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
 import io.thelandscape.krawler.http.ContentFetchError
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
+import io.thelandscape.krawler.http.Request
 
 /**
  * Created by brian.a.madden@gmail.com on 10/26/16.
@@ -22,7 +26,7 @@ import io.thelandscape.krawler.http.KrawlUrl
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-abstract class Krawler(config: KrawlConfig) {
+abstract class Krawler(val config: KrawlConfig) {
 
     /**
      * Override this function to determine if a URL should be visited.
@@ -72,11 +76,80 @@ abstract class Krawler(config: KrawlConfig) {
         return
     }
 
-    fun start(seedUrl: String) { TODO() }
-    fun start(seedUrl: List<String>) { TODO() }
+
+    fun start(seedUrl: String) = start(listOf(seedUrl))
+
+    fun start(seedUrl: List<String>) = doCrawl(seedUrl)
+
     fun stop() { TODO() }
+
     fun shutdown() { TODO() }
 
-    private fun doCrawl() { TODO() }
+    private fun doCrawl(seedUrl: List<String>) {
+
+        // Create our queue
+        val queue: KrawlQueue = KrawlQueue()
+
+        // Convert all URLs to KrawlUrls
+        val krawlUrls: List<KrawlUrl> = seedUrl.map(::KrawlUrl)
+
+        // Insert the seeds
+        queue.push(krawlUrls.map{ QueueEntry(it.canonicalForm, 0) })
+
+        // State variables
+        var continueCrawling: Boolean = true
+        val domainVisitCounts: Map<String, Int> = mutableMapOf()
+        var globalVisitCount: Int = 0
+        var emptyQueueWaitCount: Int = 0
+
+        while(continueCrawling) {
+
+            // Quit if global threshold met
+            if (globalVisitCount == config.globalTotalPages)
+                break
+
+            // Pop a URL off the queue
+            var qe: QueueEntry? = queue.pop()
+            if (qe == null) {
+
+                // Wait for the configured period for more URLs
+                while(emptyQueueWaitCount < config.emptyQueueWait) {
+                    Thread.sleep(1000)
+                    emptyQueueWaitCount++
+
+                    // Try to pop again
+                    qe = queue.pop()
+
+                    // If we have something, reset the count and move on
+                    if (qe != null) {
+                        emptyQueueWaitCount = 0
+                        break
+                    }
+
+                    // If we've hit the limit, time to quit
+                    if (emptyQueueWaitCount == config.emptyQueueWait)
+                        return
+                }
+            }
+
+            val krawlUrl: KrawlUrl = KrawlUrl(qe!!.url)
+
+            // Make sure we're within domain limits
+            if (domainVisitCounts.getOrElse(krawlUrl.domain, {0}) >= config.domainTotalPages)
+                break
+
+            // If we're supposed to visit this, get the HTML and call visit
+            if (shouldVisit(krawlUrl)) {
+                val doc: KrawlDocument = Request.getUrl(krawlUrl)
+                visit(krawlUrl, doc)
+            }
+
+            // If we're supposed to check this, get the status code and call check
+            if (shouldCheck(krawlUrl)) {
+                val code: Int = Request.checkUrl(krawlUrl)
+                check(krawlUrl, code)
+            }
+        }
+    }
 
 }

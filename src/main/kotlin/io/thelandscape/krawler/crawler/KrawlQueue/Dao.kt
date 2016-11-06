@@ -40,7 +40,6 @@ object krawlQueueTable : Table<QueueEntry, String>("krawlQueue", TableConfigurat
 
 }
 
-// TODO: Move this somewhere better
 private class HSQLConnection(fileBacked: Boolean, fileName: String = ".krawl_tmp") {
     val cpds: ComboPooledDataSource = ComboPooledDataSource()
 
@@ -64,6 +63,11 @@ internal val KrawlQueueDao = KrawlQueueHSQLDao(session)
 
 class KrawlQueueHSQLDao(session: Session):
         KrawlQueueIf, AbstractDao<QueueEntry, String>(session, krawlQueueTable, QueueEntry::url) {
+
+    init {
+        // Create queue table
+        session.update("CREATE TABLE IF NOT EXISTS krawlQueue")
+    }
 
     override fun pop(n: Int): List<QueueEntry> {
 

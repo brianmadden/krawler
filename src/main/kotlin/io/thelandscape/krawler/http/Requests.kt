@@ -65,8 +65,9 @@ class Requests(val httpClient: CloseableHttpClient = HttpClients.createDefault()
     }
 }
 
-/** Error representing any failure to fetch content.
- * Will contain the root cause as well as the requested URL.
+/**
+ * Error representing any failure to fetch content.
+ * Will contain the root cause exception as well as the requested URL.
  */
 class ContentFetchError(url: KrawlUrl, cause: Throwable):
         Throwable("Failed to retrieve the content for ${url.canonicalForm}.", cause)
