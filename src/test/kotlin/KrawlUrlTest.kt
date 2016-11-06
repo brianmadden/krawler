@@ -24,7 +24,12 @@ import kotlin.test.assertTrue
 
 class KrawlUrlTest {
 
-    val testUrl = KrawlUrl("http://www.abc.com/./")
+    val rawUrl = "http://www.abc.com/./"
+    val testUrl = KrawlUrl(rawUrl)
+
+    @Test fun testRawURL() {
+        assertEquals(rawUrl, testUrl.rawUrl)
+    }
 
     @Test fun testIsHttp() {
         // Verify that an absolute URL with http & https isHttp returns true

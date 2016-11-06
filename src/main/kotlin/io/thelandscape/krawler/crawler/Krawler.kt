@@ -1,12 +1,16 @@
 package io.thelandscape.krawler.crawler
 
-import com.sun.org.apache.xpath.internal.operations.Bool
-import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueue
-import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
+import io.thelandscape.krawler.crawler.KrawlQueue.*
 import io.thelandscape.krawler.http.ContentFetchError
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.Request
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 
 /**
  * Created by brian.a.madden@gmail.com on 10/26/16.
@@ -26,7 +30,15 @@ import io.thelandscape.krawler.http.Request
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-abstract class Krawler(val config: KrawlConfig) {
+/**
+ * Class defines the operations and data structures used to perform a web crawl.
+ *
+ * @param config: A KrawlConfig object to control the limits and settings of the crawler
+ * @param queue: A KrawlQueueIf provider, by default this will be a HSQL backed queue defined in the Dao
+ *
+ */
+abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
+                       private val queue: KrawlQueueIf = KrawlQueueDao) {
 
     /**
      * Override this function to determine if a URL should be visited.
@@ -76,30 +88,44 @@ abstract class Krawler(val config: KrawlConfig) {
         return
     }
 
-
     fun start(seedUrl: String) = start(listOf(seedUrl))
 
-    fun start(seedUrl: List<String>) = doCrawl(seedUrl)
-
-    fun stop() { TODO() }
-
-    fun shutdown() { TODO() }
-
-    private fun doCrawl(seedUrl: List<String>) {
-
-        // Create our queue
-        val queue: KrawlQueue = KrawlQueue()
-
+    fun start(seedUrl: List<String>,
+              threadpool: ExecutorService = Executors.newFixedThreadPool(config.numThreads)) {
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map(::KrawlUrl)
 
         // Insert the seeds
         queue.push(krawlUrls.map{ QueueEntry(it.canonicalForm, 0) })
 
-        // State variables
-        var continueCrawling: Boolean = true
-        val domainVisitCounts: Map<String, Int> = mutableMapOf()
-        var globalVisitCount: Int = 0
+        (0..config.numThreads - 1).forEach { threadpool.submit { doCrawl() } }
+    }
+
+    fun stop() { TODO() }
+
+    fun shutdown() { TODO() }
+
+    // Private members
+    // Manage whether or not we should continue crawling
+    private val continueLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
+    private var continueCrawling: Boolean = true
+        get() = continueLock.read {
+            field
+        }
+        set(value) = continueLock.write {
+            field = value
+        }
+
+    // Global visit count and domain visit count
+    val globalVisitCountLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
+    var globalVisitCount: Int = 0
+        get() = globalVisitCountLock.read { field }
+        set(value) = globalVisitCountLock.write { field = value }
+
+    val domainVisitCounts: MutableMap<String, Int> = ConcurrentHashMap()
+
+    private fun doCrawl() {
+
         var emptyQueueWaitCount: Int = 0
 
         while(continueCrawling) {
@@ -135,8 +161,13 @@ abstract class Krawler(val config: KrawlConfig) {
             val krawlUrl: KrawlUrl = KrawlUrl(qe!!.url)
 
             // Make sure we're within domain limits
-            if (domainVisitCounts.getOrElse(krawlUrl.domain, {0}) >= config.domainTotalPages)
+            // TODO: Fix race condition where you can crawl config.numThreads extra pages per domain
+            val domainCount = domainVisitCounts.getOrElse(krawlUrl.domain, { 0 })
+            if (domainCount >= config.domainTotalPages)
                 break
+
+            // Increment the domain visit count
+            domainVisitCounts[krawlUrl.domain] = domainCount + 1
 
             // If we're supposed to visit this, get the HTML and call visit
             if (shouldVisit(krawlUrl)) {

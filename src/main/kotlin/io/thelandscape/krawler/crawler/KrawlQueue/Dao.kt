@@ -66,10 +66,15 @@ class KrawlQueueHSQLDao(session: Session):
 
     init {
         // Create queue table
-        session.update("CREATE TABLE IF NOT EXISTS krawlQueue")
+        session.update("CREATE TABLE IF NOT EXISTS krawlQueue" +
+                "(url VARCHAR(255) NOT NULL PRIMARY KEY, depth INT, timestamp TIMESTAMP)")
     }
 
-    override fun pop(n: Int): List<QueueEntry> {
+    override fun pop(): QueueEntry? {
+        return pop(1).firstOrNull()
+    }
+
+    private fun pop(n: Int): List<QueueEntry> {
 
         val selectSql = "SELECT TOP :n $columns FROM ${table.name}"
         val params = mapOf("n" to n)

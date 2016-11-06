@@ -23,23 +23,6 @@ package io.thelandscape.krawler.crawler.KrawlQueue
  * Interface representing a KrawlQueue
  */
 interface KrawlQueueIf {
-
-    fun pop (n: Int = 1): List<QueueEntry>
+    fun pop (): QueueEntry?
     fun push (urls: List<QueueEntry>): List<QueueEntry>
-}
-
-class KrawlQueue(private val queueDao: KrawlQueueIf = KrawlQueueDao): KrawlQueueIf {
-
-    fun pop(): QueueEntry? {
-        return queueDao.pop().firstOrNull()
-    }
-
-    override fun pop(n: Int): List<QueueEntry> {
-        return queueDao.pop(n)
-    }
-
-    override fun push(urls: List<QueueEntry>): List<QueueEntry> {
-        return queueDao.push(urls)
-    }
-
 }

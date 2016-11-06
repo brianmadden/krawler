@@ -19,12 +19,7 @@
 import com.github.andrewoma.kwery.core.DefaultSession
 import com.github.andrewoma.kwery.core.Session
 import com.github.andrewoma.kwery.core.dialect.HsqlDialect
-import com.nhaarman.mockito_kotlin.mock
-import com.nhaarman.mockito_kotlin.times
-import com.nhaarman.mockito_kotlin.verify
-import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueue
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueHSQLDao
-import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
 import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
 import org.junit.After
 import org.junit.Before
@@ -32,32 +27,9 @@ import org.junit.Test
 import java.sql.Connection
 import java.sql.DriverManager
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
-
-// KrawlQueue test
-class KrawlQueueTest {
-
-    val krawlQueueDao: KrawlQueueIf = mock()
-    val krawlQueue: KrawlQueue = KrawlQueue(krawlQueueDao)
-
-    @Test fun pushTest() {
-        val urls = listOf(
-                QueueEntry("http://www.a.com", 0),
-                QueueEntry("http://www.b.com", 0)
-        )
-        krawlQueue.push(urls)
-
-        verify(krawlQueueDao, times(1)).push(urls)
-    }
-
-    @Test fun popTest() {
-        val numToPop: Int = 3
-        krawlQueue.pop(numToPop)
-
-        verify(krawlQueueDao, times(1)).pop(numToPop)
-    }
-}
-
 
 // Dao tests
 class KrawlQueueHSQLDaoTest {
@@ -66,16 +38,6 @@ class KrawlQueueHSQLDaoTest {
     val session: Session = DefaultSession(connection, HsqlDialect())
 
     val dao: KrawlQueueHSQLDao = KrawlQueueHSQLDao(session)
-
-    @Before fun setUp() {
-        dao.session.update("CREATE TABLE IF NOT EXISTS krawlQueue " +
-                "(url VARCHAR(255) NOT NULL PRIMARY KEY, depth INT, timestamp TIMESTAMP)",
-                mapOf())
-    }
-
-    @After fun tearDown() {
-        dao.session.update("SHUTDOWN")
-    }
 
     @Test fun testPush() {
         val urls: List<QueueEntry> = listOf(
@@ -94,15 +56,19 @@ class KrawlQueueHSQLDaoTest {
                 QueueEntry("http://www.z.com", 1))
         dao.push(list)
 
-        val popped = dao.pop(3)
-        assertTrue { popped.isNotEmpty() }
-        assertEquals("http://www.x.com", popped[0].url)
-        assertEquals("http://www.y.com", popped[1].url)
-        assertEquals("http://www.z.com", popped[2].url)
-        assertEquals(0, dao.pop().size)
+        var popped = dao.pop()
+        assertNotNull( popped )
+        assertEquals("http://www.x.com", popped?.url)
 
-        dao.push(list)
-        dao.pop(2)
-        assertEquals(1, dao.pop().size)
+        popped = dao.pop()
+        assertNotNull( popped )
+        assertEquals("http://www.y.com", popped?.url)
+
+        popped = dao.pop()
+        assertNotNull( popped )
+        assertEquals("http://www.z.com", popped?.url)
+
+        popped = dao.pop()
+        assertNull( popped )
     }
 }

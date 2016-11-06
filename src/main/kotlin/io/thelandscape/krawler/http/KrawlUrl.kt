@@ -1,7 +1,6 @@
 package io.thelandscape.krawler.http
 
 import java.net.URI
-import java.net.URL
 
 /**
  * Created by @brianmadden on 10/21/16.
@@ -21,16 +20,23 @@ import java.net.URL
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+/**
+ * Class to represent a URL that was either provided as a seed, or found during crawl.
+ * If the URL was found during crawl, it will contain additional information such as
+ * the anchor text, rel property, and any other pertinent data, otherwise these fields
+ * will be blank.
+ *
+ */
 class KrawlUrl(url: String) {
 
+    private val uri: URI = URI(url)
+
     val rawUrl: String = url
-    private val uri: URI = URI(rawUrl)
-    private val url: URL = uri.toURL()
 
     // It is HTTP if it is -NOT- opaque and
     val isHttp: Boolean = !uri.isOpaque &&
             // it is not absolute OR it is absolute and it's scheme is http or https
-            (!uri.isAbsolute || (uri.isAbsolute && (uri.scheme != "http" || uri.scheme != "https")))
+            (!uri.isAbsolute || (uri.isAbsolute && (uri.scheme == "http" || uri.scheme == "https")))
 
     val canonicalForm: String
         get() = if (uri.isOpaque) normalForm else {
@@ -43,12 +49,20 @@ class KrawlUrl(url: String) {
     val normalForm: String
         get() = uri.normalize().toASCIIString()
 
+    val wasExtractedFromAnchor: Boolean = false
+
+    // TODO: Find just the TLD suffix
+    // Get a list from https://publicsuffix.org/list/public_suffix_list.dat
+    val suffix: String = ""
+
+    // TODO: Find the domain name. Should be easier once we've got the suffix because we can work backwards
     val domain: String
-        get() {
-            val x = uri.toURL()
-            val host: String = uri.host
-            return x.host
-        }
+        get() = ""
+
+
+    // TODO: Find path
+    val path: String = ""
+
 
     override fun toString(): String = canonicalForm
 
