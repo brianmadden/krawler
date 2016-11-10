@@ -1,6 +1,7 @@
 package io.thelandscape.krawler.http
 
 import java.net.URI
+import com.google.common.net.InternetDomainName
 
 /**
  * Created by @brianmadden on 10/21/16.
@@ -30,6 +31,11 @@ import java.net.URI
 class KrawlUrl(url: String) {
 
     private val uri: URI = URI(url)
+    private val idn: InternetDomainName? = try {
+        InternetDomainName.from(uri.host)
+    } catch (e: NullPointerException) {
+        null
+    }
 
     val rawUrl: String = url
 
@@ -53,12 +59,20 @@ class KrawlUrl(url: String) {
 
     // TODO: Find just the TLD suffix
     // Get a list from https://publicsuffix.org/list/public_suffix_list.dat
-    val suffix: String = ""
+    val suffix: String
+        get() = idn?.publicSuffix().toString()
 
-    // TODO: Find the domain name. Should be easier once we've got the suffix because we can work backwards
+
     val domain: String
-        get() = ""
+        get() = uri.host
+                .replace("." + suffix, "")
+                .split(".")
+                .last()
 
+    val subdomain: String
+        get() = uri.host
+                .replace("." + suffix, "")
+                .replace("." + domain, "")
 
     // TODO: Find path
     val path: String = ""

@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 
 class KrawlUrlTest {
 
-    val rawUrl = "http://www.abc.com/./"
+    val rawUrl = "http://www.xyz.abc.com/./"
     val testUrl = KrawlUrl(rawUrl)
 
     @Test fun testRawURL() {
@@ -56,7 +56,15 @@ class KrawlUrlTest {
         assertFalse(testUrl.normalForm.contains("///.//"))
     }
 
+    @Test fun testSuffix() {
+        assertEquals("com", testUrl.suffix)
+    }
+
     @Test fun testDomain() {
-        assertEquals("abc.com", testUrl.domain)
+        assertEquals("abc", testUrl.domain)
+    }
+
+    @Test fun testSubdomain() {
+        assertEquals("www.xyz", testUrl.subdomain)
     }
 }
