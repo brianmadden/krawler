@@ -46,7 +46,7 @@ class KrawlUrl(url: String) {
 
     val canonicalForm: String
         get() = if (uri.isOpaque) normalForm else {
-            if (normalForm.endsWith("/"))
+            if (normalForm.endsWith("/") || !normalForm.endsWith(suffix))
                 normalForm
             else
                 normalForm + "/"
@@ -75,7 +75,7 @@ class KrawlUrl(url: String) {
                 .replace("." + domain, "")
 
     // TODO: Find path
-    val path: String = ""
+    val path: String = uri.path ?: ""
 
 
     override fun toString(): String = canonicalForm

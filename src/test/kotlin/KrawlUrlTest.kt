@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 
 class KrawlUrlTest {
 
-    val rawUrl = "http://www.xyz.abc.com/./"
+    val rawUrl = "http://www.xyz.abc.com/./zyxzzy"
     val testUrl = KrawlUrl(rawUrl)
 
     @Test fun testRawURL() {
@@ -46,9 +46,21 @@ class KrawlUrlTest {
         assertFalse { opaqueUri.isHttp }
     }
 
-    // it should have a canonical and normal form that are equal
-    @Test fun normalFormIsCanonicalForm() {
-        assertEquals(testUrl.canonicalForm, testUrl.normalForm)
+    @Test fun testCanonicalForm() {
+        // it should have a canonical form that is normalized
+        assertEquals("http://www.xyz.abc.com/zyxzzy", testUrl.canonicalForm)
+
+        // It should have a canonical form that adds a slash if the URL ends with the domain suffix
+        val testAddSlash = KrawlUrl("http://www.xyz.com")
+        assertEquals("http://www.xyz.com/", testAddSlash.canonicalForm)
+
+        // It should have a canonical form that does not add a slash if it is already present
+        val testNoAddDoubleSlash = KrawlUrl("http://www.xyz.com/")
+        assertEquals("http://www.xyz.com/", testNoAddDoubleSlash.canonicalForm)
+
+        // It should have a canonical form that does not add a slash if the URL does not end with the domain suffix
+        val testNoAddSlash = KrawlUrl("http://www.xyz.com/index.html")
+        assertEquals("http://www.xyz.com/index.html", testNoAddSlash.canonicalForm)
     }
 
     @Test fun testNormalForm() {
@@ -66,5 +78,9 @@ class KrawlUrlTest {
 
     @Test fun testSubdomain() {
         assertEquals("www.xyz", testUrl.subdomain)
+    }
+
+    @Test fun testPath() {
+        assertEquals("/./zyxzzy", testUrl.path)
     }
 }
