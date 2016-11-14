@@ -24,12 +24,13 @@ import kotlin.test.assertTrue
 
 class KrawlUrlTest {
 
+    private val anchorNode: String = "<a href='http://www.google.com/./zxyzzy' " +
+            "rel='canonical' target='blank'> Anchor Text</a>"
+
     val rawUrl = "http://www.xyz.abc.com/./zyxzzy"
     val testUrl = KrawlUrl(rawUrl)
 
-    @Test fun testRawURL() {
-        assertEquals(rawUrl, testUrl.rawUrl)
-    }
+    @Test fun testRawURL() = assertEquals(rawUrl, testUrl.rawUrl)
 
     @Test fun testIsHttp() {
         // Verify that an absolute URL with http & https isHttp returns true
@@ -63,24 +64,17 @@ class KrawlUrlTest {
         assertEquals("http://www.xyz.com/index.html", testNoAddSlash.canonicalForm)
     }
 
-    @Test fun testNormalForm() {
-        // it should have no /./ in normalized form
-        assertFalse(testUrl.normalForm.contains("///.//"))
-    }
+    // it should have no /./ in normalized form
+    @Test fun testNormalForm() = assertFalse(testUrl.normalForm.contains("///.//"))
 
-    @Test fun testSuffix() {
-        assertEquals("com", testUrl.suffix)
-    }
+    @Test fun testSuffix() = assertEquals("com", testUrl.suffix)
 
-    @Test fun testDomain() {
-        assertEquals("abc", testUrl.domain)
-    }
+    @Test fun testDomain() = assertEquals("abc", testUrl.domain)
 
-    @Test fun testSubdomain() {
-        assertEquals("www.xyz", testUrl.subdomain)
-    }
+    @Test fun testSubdomain() = assertEquals("www.xyz", testUrl.subdomain)
 
-    @Test fun testPath() {
-        assertEquals("/./zyxzzy", testUrl.path)
-    }
+    @Test fun testPath() = assertEquals("/./zyxzzy", testUrl.path)
+
+    @Test fun testExtractedFromAnchor() = assertFalse(testUrl.wasExtractedFromAnchor)
+
 }

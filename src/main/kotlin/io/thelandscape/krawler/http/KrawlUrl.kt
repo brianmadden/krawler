@@ -3,6 +3,17 @@ package io.thelandscape.krawler.http
 import java.net.URI
 import com.google.common.net.InternetDomainName
 
+import javax.xml.parsers.DocumentBuilder
+import javax.xml.parsers.DocumentBuilderFactory
+
+import org.xml.sax.InputSource
+import javax.xml.soap.Node
+
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathFactory;
+import javax.xml.xpath.XPathConstants
+
+
 /**
  * Created by @brianmadden on 10/21/16.
  *
@@ -28,7 +39,30 @@ import com.google.common.net.InternetDomainName
  * will be blank.
  *
  */
+
 class KrawlUrl(url: String) {
+
+    // All of these setters will be private so that we can't set these from the outside
+    var wasExtractedFromAnchor = false
+        private set
+
+    var anchorText: String? = null
+        private set
+
+    var anchorAttributes: Map<String, String>? = null
+        private set
+
+    // Constructor used when we pass a full anchor tag in
+    constructor(anchor: Node): this(anchor.attributes.getNamedItem("href").nodeValue) {
+        wasExtractedFromAnchor = true
+        // Anchor text is actually contained within the first child node
+        anchorText = anchor.firstChild.nodeValue
+        // Attributes are a map of Nodes where each Node is an Attribute
+        // (https://docs.oracle.com/javase/8/docs/api/org/w3c/dom/Node.html)
+        anchorAttributes = (0..anchor.attributes.length - 1).associate {
+            anchor.attributes.item(it).nodeName to anchor.attributes.item(it).nodeValue
+        }
+    }
 
     private val uri: URI = URI(url)
     private val idn: InternetDomainName? = try {
@@ -55,11 +89,8 @@ class KrawlUrl(url: String) {
     val normalForm: String
         get() = uri.normalize().toASCIIString()
 
-    val wasExtractedFromAnchor: Boolean = false
-
-    // TODO: Find just the TLD suffix
-    // Get a list from https://publicsuffix.org/list/public_suffix_list.dat
     val suffix: String
+        // Get a list of TLDs from https://publicsuffix.org/list/public_suffix_list.dat
         get() = idn?.publicSuffix().toString()
 
 
@@ -74,7 +105,6 @@ class KrawlUrl(url: String) {
                 .replace("." + suffix, "")
                 .replace("." + domain, "")
 
-    // TODO: Find path
     val path: String = uri.path ?: ""
 
 

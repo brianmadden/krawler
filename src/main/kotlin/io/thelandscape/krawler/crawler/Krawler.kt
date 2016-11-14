@@ -88,6 +88,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         return
     }
 
+    fun startNonblocking(): Unit = TODO()
+
     fun start(seedUrl: String) = start(listOf(seedUrl))
 
     fun start(seedUrl: List<String>,
