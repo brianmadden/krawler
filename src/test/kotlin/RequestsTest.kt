@@ -31,7 +31,7 @@ private val mockHttpClient = mock<CloseableHttpClient> {}
 class RequestsTest {
 
     val request: Requests = Requests(mockHttpClient)
-    val testUrl = KrawlUrl("http://httpbin.org")
+    val testUrl = KrawlUrl.new("http://httpbin.org")
 
     @Test fun testRequestCheck() {
         try {

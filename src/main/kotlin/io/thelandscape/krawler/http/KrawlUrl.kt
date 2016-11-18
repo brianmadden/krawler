@@ -1,17 +1,9 @@
 package io.thelandscape.krawler.http
 
-import java.net.URI
 import com.google.common.net.InternetDomainName
-
-import javax.xml.parsers.DocumentBuilder
-import javax.xml.parsers.DocumentBuilderFactory
-
-import org.xml.sax.InputSource
-import javax.xml.soap.Node
-
-import javax.xml.xpath.XPath;
-import javax.xml.xpath.XPathFactory;
-import javax.xml.xpath.XPathConstants
+import org.w3c.dom.Element
+import java.net.URI
+import org.w3c.dom.Node
 
 
 /**
@@ -40,7 +32,19 @@ import javax.xml.xpath.XPathConstants
  *
  */
 
-class KrawlUrl(url: String) {
+class KrawlUrl private constructor(url: String) {
+
+    companion object {
+        fun new(url: String): KrawlUrl {
+            return KrawlUrl(url)
+        }
+
+        fun new(anchor: Element): KrawlUrl? {
+            if (anchor.tagName != "a" && !anchor.hasAttribute("href"))
+                return null
+            return KrawlUrl(anchor)
+        }
+    }
 
     // All of these setters will be private so that we can't set these from the outside
     var wasExtractedFromAnchor = false
@@ -53,7 +57,8 @@ class KrawlUrl(url: String) {
         private set
 
     // Constructor used when we pass a full anchor tag in
-    constructor(anchor: Node): this(anchor.attributes.getNamedItem("href").nodeValue) {
+    private constructor(anchor: Element): this(anchor.getAttribute("href")) {
+
         wasExtractedFromAnchor = true
         // Anchor text is actually contained within the first child node
         anchorText = anchor.firstChild.nodeValue

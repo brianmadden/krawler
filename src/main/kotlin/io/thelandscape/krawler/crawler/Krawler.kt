@@ -95,7 +95,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     fun start(seedUrl: List<String>,
               threadpool: ExecutorService = Executors.newFixedThreadPool(config.numThreads)) {
         // Convert all URLs to KrawlUrls
-        val krawlUrls: List<KrawlUrl> = seedUrl.map(::KrawlUrl)
+        val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.Companion.new(it) }
 
         // Insert the seeds
         queue.push(krawlUrls.map{ QueueEntry(it.canonicalForm, 0) })
@@ -160,7 +160,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 }
             }
 
-            val krawlUrl: KrawlUrl = KrawlUrl(qe!!.url)
+            val krawlUrl: KrawlUrl = KrawlUrl.new(qe!!.url)
 
             // Make sure we're within domain limits
             // TODO: Fix race condition where you can crawl config.numThreads extra pages per domain

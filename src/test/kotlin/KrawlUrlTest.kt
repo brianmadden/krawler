@@ -1,8 +1,12 @@
 import io.thelandscape.krawler.http.KrawlUrl
 import org.junit.Test
+import org.w3c.dom.Element
+import java.io.ByteArrayInputStream
+import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+
 
 /**
  * Created by brian.a.madden@gmail.com on 10/21/16.
@@ -25,25 +29,31 @@ import kotlin.test.assertTrue
 class KrawlUrlTest {
 
     private val anchorNode: String = "<a href='http://www.google.com/./zxyzzy' " +
-            "rel='canonical' target='blank'> Anchor Text</a>"
+            "rel='canonical' target='blank'>Anchor Text</a>"
+    private val dbf = DocumentBuilderFactory.newInstance()
+    private val db = dbf.newDocumentBuilder()
+    private val doc: Element = db.parse(ByteArrayInputStream(anchorNode.toByteArray())).documentElement
+
+    // TODO: Parse this into a proper Node so that we can test the secondary constructor for KrawlUrl
 
     val rawUrl = "http://www.xyz.abc.com/./zyxzzy"
-    val testUrl = KrawlUrl(rawUrl)
+    val testUrl = KrawlUrl.new(rawUrl)
+    val anchorTestUrl = KrawlUrl.new(doc)
 
     @Test fun testRawURL() = assertEquals(rawUrl, testUrl.rawUrl)
 
     @Test fun testIsHttp() {
         // Verify that an absolute URL with http & https isHttp returns true
-        val absoluteHttp = KrawlUrl("http://www.abc.com")
-        val absoluteHttps = KrawlUrl("https://www.abc.com")
+        val absoluteHttp = KrawlUrl.new("http://www.abc.com")
+        val absoluteHttps = KrawlUrl.new("https://www.abc.com")
         assertTrue { absoluteHttp.isHttp && absoluteHttps.isHttp }
 
         // Verify that absolute URLs with a scheme other than http isHttp returns false
-        val absoluteNonHttp = KrawlUrl("file://abc/def")
+        val absoluteNonHttp = KrawlUrl.new("file://abc/def")
         assertFalse { absoluteNonHttp.isHttp }
 
         // Verify that an opaque URI isHttp returns false
-        val opaqueUri = KrawlUrl("mailto:abc@abc.com")
+        val opaqueUri = KrawlUrl.new("mailto:abc@abc.com")
         assertFalse { opaqueUri.isHttp }
     }
 
@@ -52,15 +62,15 @@ class KrawlUrlTest {
         assertEquals("http://www.xyz.abc.com/zyxzzy", testUrl.canonicalForm)
 
         // It should have a canonical form that adds a slash if the URL ends with the domain suffix
-        val testAddSlash = KrawlUrl("http://www.xyz.com")
+        val testAddSlash = KrawlUrl.new("http://www.xyz.com")
         assertEquals("http://www.xyz.com/", testAddSlash.canonicalForm)
 
         // It should have a canonical form that does not add a slash if it is already present
-        val testNoAddDoubleSlash = KrawlUrl("http://www.xyz.com/")
+        val testNoAddDoubleSlash = KrawlUrl.new("http://www.xyz.com/")
         assertEquals("http://www.xyz.com/", testNoAddDoubleSlash.canonicalForm)
 
         // It should have a canonical form that does not add a slash if the URL does not end with the domain suffix
-        val testNoAddSlash = KrawlUrl("http://www.xyz.com/index.html")
+        val testNoAddSlash = KrawlUrl.new("http://www.xyz.com/index.html")
         assertEquals("http://www.xyz.com/index.html", testNoAddSlash.canonicalForm)
     }
 
@@ -75,6 +85,18 @@ class KrawlUrlTest {
 
     @Test fun testPath() = assertEquals("/./zyxzzy", testUrl.path)
 
-    @Test fun testExtractedFromAnchor() = assertFalse(testUrl.wasExtractedFromAnchor)
+    @Test fun testExtractedFromAnchor() {
+        // The test URL was from a string
+        assertFalse(testUrl.wasExtractedFromAnchor)
+        // The anchorTestUrl was from an anchor tag
+
+        // It was extracted from an anchor
+        assertTrue(anchorTestUrl!!.wasExtractedFromAnchor)
+        // It should have text associated with the anchor text
+        assertEquals("Anchor Text", anchorTestUrl.anchorText)
+        // It should have attributes
+        val expectedAttrs = mapOf("href" to "http://www.google.com/./zxyzzy", "rel" to "canonical", "target" to "blank")
+        assertEquals(expectedAttrs, anchorTestUrl.anchorAttributes)
+    }
 
 }
