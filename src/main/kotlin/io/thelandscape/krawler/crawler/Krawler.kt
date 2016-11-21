@@ -1,14 +1,18 @@
 package io.thelandscape.krawler.crawler
 
-import io.thelandscape.krawler.crawler.KrawlQueue.*
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueDao
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
+import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
 import io.thelandscape.krawler.http.ContentFetchError
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.Request
+import org.w3c.dom.Element
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.locks.ReentrantReadWriteLock
+import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 
@@ -111,12 +115,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     // Manage whether or not we should continue crawling
     private val continueLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
     private var continueCrawling: Boolean = true
-        get() = continueLock.read {
-            field
-        }
-        set(value) = continueLock.write {
-            field = value
-        }
+        get() = continueLock.read { field }
+        set(value) = continueLock.write { field = value }
 
     // Global visit count and domain visit count
     val globalVisitCountLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
@@ -174,6 +174,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             // If we're supposed to visit this, get the HTML and call visit
             if (shouldVisit(krawlUrl)) {
                 val doc: KrawlDocument = Request.getUrl(krawlUrl)
+                // TODO: Find links, add them to the queue
                 visit(krawlUrl, doc)
             }
 

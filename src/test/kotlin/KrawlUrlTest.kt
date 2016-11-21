@@ -34,8 +34,6 @@ class KrawlUrlTest {
     private val db = dbf.newDocumentBuilder()
     private val doc: Element = db.parse(ByteArrayInputStream(anchorNode.toByteArray())).documentElement
 
-    // TODO: Parse this into a proper Node so that we can test the secondary constructor for KrawlUrl
-
     val rawUrl = "http://www.xyz.abc.com/./zyxzzy"
     val testUrl = KrawlUrl.new(rawUrl)
     val anchorTestUrl = KrawlUrl.new(doc)

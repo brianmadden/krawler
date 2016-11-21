@@ -2,6 +2,12 @@ package io.thelandscape.krawler.http
 
 import org.apache.http.HttpResponse
 import org.apache.http.util.EntityUtils
+import org.w3c.dom.Document
+import org.w3c.dom.Element
+import org.w3c.dom.Node
+import org.w3c.dom.NodeList
+import java.io.ByteArrayInputStream
+import javax.xml.parsers.DocumentBuilderFactory
 
 /**
  * Created by brian.a.madden@gmail.com on 10/26/16.
@@ -42,4 +48,26 @@ class KrawlDocument(private val response: HttpResponse) {
     val statusCode: Int
         get() = response.statusLine.statusCode
 
+    /**
+     * Anchor tags pulled out
+     */
+    private val dbf = DocumentBuilderFactory.newInstance()
+    private val db = dbf.newDocumentBuilder()
+    val anchorTags: List<Element>
+        get() {
+            val parsed: Document = try {
+                db.parse(ByteArrayInputStream(rawHtml.toByteArray()))
+            } catch (e: Exception) {
+                return listOf()
+            }
+
+            return parsed.getElementsByTagName("a").toElementList()
+        }
+
+    /// Utility method to convert a NodeList to a List<Element>
+    private fun NodeList.toElementList(): List<Element> {
+        return (0..this.length - 1)
+                .map { this.item(it) }
+                .map { it as Element }
+    }
 }

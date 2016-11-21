@@ -39,7 +39,8 @@ private fun prepareResponse(expectedResponseCode: Int, responseBody: String): Ht
     return ret
 }
 
-private val mockReturn = prepareResponse(200, "")
+private val mockReturn = prepareResponse(200, "<html><head><title>ABC</title></head>" +
+        "<body><a href='http://www.google.com' rel='canonical'>ABC LINK</a></body></html>")
 
 
 class CrawlDocumentTest {
@@ -54,15 +55,19 @@ class CrawlDocumentTest {
         assertTrue { doc.headers.isEmpty() }
     }
 
-    // it should have a rawHtml element
     @Test fun testRawHtmlProperty() {
-        assertTrue { doc.rawHtml.isEmpty() }
+        // it should have a rawHtml element with a title and one anchor tag
+        assertEquals("<html><head><title>ABC</title></head>" +
+                "<body><a href='http://www.google.com' rel='canonical'>ABC LINK</a></body></html>", doc.rawHtml)
     }
 
+    @Test fun testAnchorTags() {
+        // It should only have one anchor tag
+        assertEquals(1, doc.anchorTags.size)
+    }
 
     // it should have a status code of 200
     @Test fun testStatusCode() {
         assertEquals(200, doc.statusCode)
     }
-
 }
