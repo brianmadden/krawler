@@ -4,7 +4,6 @@ import org.apache.http.HttpResponse
 import org.apache.http.util.EntityUtils
 import org.w3c.dom.Document
 import org.w3c.dom.Element
-import org.w3c.dom.Node
 import org.w3c.dom.NodeList
 import java.io.ByteArrayInputStream
 import javax.xml.parsers.DocumentBuilderFactory
@@ -38,9 +37,7 @@ class KrawlDocument(private val response: HttpResponse) {
     /**
      * Raw HTML
      */
-    val rawHtml: String
-        get() = if (response.entity != null) EntityUtils.toString(response.entity) else ""
-
+    val rawHtml: String = EntityUtils.toString(response.entity)
 
     /**
      * Status code

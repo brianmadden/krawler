@@ -7,12 +7,10 @@ import io.thelandscape.krawler.http.ContentFetchError
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.Request
-import org.w3c.dom.Element
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.locks.ReentrantReadWriteLock
-import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 
@@ -56,6 +54,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     /**
      * Override this function to determine if a URL should be checked.
      * Checking a URL will issue an HTTP HEAD request, and return only a status code.
+     * Note: This will not GET the content of a page, and as a result will not follow any links on the checked page.
+     * As such checking a page should be reserved for content that does not contain hyperlinks.
      * @param url KrawlUrl: The URL to consider visiting.
      *
      * @return boolean: true if we should check, false otherwise
@@ -71,6 +71,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
     /**
      * Check a URL by issuing an HTTP HEAD request
+     * Note: This will not GET the content of a page, and as a result will not follow any links on the checked page.
+     * As such checking a page should be reserved for content that does not contain hyperlinks.
      * @param url KrawlURL: The requested URL
      * @param statusCode Int: The resulting status code from checking the URL
      */
@@ -99,7 +101,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     fun start(seedUrl: List<String>,
               threadpool: ExecutorService = Executors.newFixedThreadPool(config.numThreads)) {
         // Convert all URLs to KrawlUrls
-        val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.Companion.new(it) }
+        val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
         // Insert the seeds
         queue.push(krawlUrls.map{ QueueEntry(it.canonicalForm, 0) })
@@ -161,6 +163,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             }
 
             val krawlUrl: KrawlUrl = KrawlUrl.new(qe!!.url)
+            val depth: Int = qe.depth
+
+            // Make sure we're within depth limit
+            if (depth >= config.maxDepth)
+                break
 
             // Make sure we're within domain limits
             // TODO: Fix race condition where you can crawl config.numThreads extra pages per domain
@@ -174,7 +181,17 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             // If we're supposed to visit this, get the HTML and call visit
             if (shouldVisit(krawlUrl)) {
                 val doc: KrawlDocument = Request.getUrl(krawlUrl)
-                // TODO: Find links, add them to the queue
+
+                // Parse out the URLs and construct queue entries from them
+                val links: List<QueueEntry> = doc.anchorTags
+                        .map { KrawlUrl.new(it) }
+                        .filterNotNull()
+                        .map { QueueEntry(it.canonicalForm, depth + 1) }
+
+                // Insert the URLs to the queue now
+                queue.push(links)
+
+                // Finally call visit
                 visit(krawlUrl, doc)
             }
 

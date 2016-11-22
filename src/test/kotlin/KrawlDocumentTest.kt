@@ -64,6 +64,8 @@ class CrawlDocumentTest {
     @Test fun testAnchorTags() {
         // It should only have one anchor tag
         assertEquals(1, doc.anchorTags.size)
+        // The href property should point to google
+        assertEquals("http://www.google.com", doc.anchorTags.first().getAttribute("href"))
     }
 
     // it should have a status code of 200
