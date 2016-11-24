@@ -81,16 +81,33 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     /**
      * Function is called on unexpected status code (non 200).
      * This can be overridden to take action on other status codes (500, 404, etc)
+     *
+     * @param url KrawlUrl: The URL that failed
+     * @param statusCode Int: The status code
      */
-    protected fun onUnexpectedStatusCode(statusCode: Int) {
+    protected fun onUnexpectedStatusCode(url: KrawlUrl, statusCode: Int) {
         return
     }
 
     /**
      * Function is called on content fetch error.
      * This can be overridden to take action on content fetch errors.
+     *
+     * @param url KrawlUrl: The URL that failed
+     * @param error ContentFetchError: The content fetch error that was thrown.
      */
-    protected fun onContentFetchError(error: ContentFetchError) {
+    protected fun onContentFetchError(url: KrawlUrl, error: ContentFetchError) {
+        return
+    }
+
+    /**
+     * Function is called if a link to a previously visited page is found.
+     * This can be overridden to take action when a URL has been seen multiple times.
+     *
+     * @param sourceUrl KrawlUrl: URL of the source page
+     * @param destinationUrl KrawlUrl: The URL of the destination
+     */
+    protected fun onDuplicateVisit(sourceUrl: KrawlUrl, destinationUrl: KrawlUrl) {
         return
     }
 
@@ -113,7 +130,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
     fun shutdown() { TODO() }
 
-    // Private members
+    /**
+     * Private members
+     */
     // Manage whether or not we should continue crawling
     private val continueLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
     private var continueCrawling: Boolean = true
@@ -121,10 +140,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         set(value) = continueLock.write { field = value }
 
     // Global visit count and domain visit count
-    val globalVisitCountLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
+    private val globalVisitCountLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
+
     var globalVisitCount: Int = 0
         get() = globalVisitCountLock.read { field }
-        set(value) = globalVisitCountLock.write { field = value }
+        private set(value) = globalVisitCountLock.write { field = value }
 
     val domainVisitCounts: MutableMap<String, Int> = ConcurrentHashMap()
 
