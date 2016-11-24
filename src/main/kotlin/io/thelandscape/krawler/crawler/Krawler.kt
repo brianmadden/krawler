@@ -85,7 +85,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @param url KrawlUrl: The URL that failed
      * @param statusCode Int: The status code
      */
-    protected fun onUnexpectedStatusCode(url: KrawlUrl, statusCode: Int) {
+    open protected fun onUnexpectedStatusCode(url: KrawlUrl, statusCode: Int) {
         return
     }
 
@@ -96,7 +96,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @param url KrawlUrl: The URL that failed
      * @param error ContentFetchError: The content fetch error that was thrown.
      */
-    protected fun onContentFetchError(url: KrawlUrl, error: ContentFetchError) {
+    open protected fun onContentFetchError(url: KrawlUrl, error: ContentFetchError) {
         return
     }
 
@@ -107,7 +107,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @param sourceUrl KrawlUrl: URL of the source page
      * @param destinationUrl KrawlUrl: The URL of the destination
      */
-    protected fun onDuplicateVisit(sourceUrl: KrawlUrl, destinationUrl: KrawlUrl) {
+    open protected fun onDuplicateVisit(sourceUrl: KrawlUrl, destinationUrl: KrawlUrl) {
         return
     }
 
