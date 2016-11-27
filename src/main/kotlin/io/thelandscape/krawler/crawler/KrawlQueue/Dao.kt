@@ -1,12 +1,9 @@
 package io.thelandscape.krawler.crawler.KrawlQueue
 
 import com.github.andrewoma.kwery.core.Session
-import com.github.andrewoma.kwery.core.ThreadLocalSession
-import com.github.andrewoma.kwery.core.dialect.HsqlDialect
 import com.github.andrewoma.kwery.mapper.*
 import com.github.andrewoma.kwery.mapper.util.camelToLowerUnderscore
-import com.mchange.v2.c3p0.ComboPooledDataSource
-import java.time.LocalDateTime
+import io.thelandscape.krawler.hsqlSession
 
 /**
  * Created by brian.a.madden@gmail.com on 10/31/16.
@@ -40,26 +37,7 @@ object krawlQueueTable : Table<QueueEntry, String>("krawlQueue", TableConfigurat
 
 }
 
-private class HSQLConnection(fileBacked: Boolean, fileName: String = ".krawl_tmp") {
-    val cpds: ComboPooledDataSource = ComboPooledDataSource()
-
-    init {
-        if (fileBacked)
-            cpds.jdbcUrl = "jdbc:hsqldb:file:$fileName"
-        else
-            cpds.jdbcUrl = "jdbc:hsqldb:mem:${LocalDateTime.now().hashCode()}"
-        cpds.user = ""
-        cpds.password = ""
-        cpds.maxConnectionAge = 600
-        cpds.isTestConnectionOnCheckin = true
-        cpds.idleConnectionTestPeriod = 500
-    }
-}
-
-private val connection = HSQLConnection(false).cpds
-private val session: ThreadLocalSession = ThreadLocalSession(connection, HsqlDialect())
-
-internal val KrawlQueueDao = KrawlQueueHSQLDao(session)
+internal val KrawlQueueDao = KrawlQueueHSQLDao(hsqlSession)
 
 class KrawlQueueHSQLDao(session: Session):
         KrawlQueueIf, AbstractDao<QueueEntry, String>(session, krawlQueueTable, QueueEntry::url) {

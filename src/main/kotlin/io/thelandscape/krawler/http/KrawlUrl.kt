@@ -98,7 +98,6 @@ class KrawlUrl private constructor(url: String) {
         // Get a list of TLDs from https://publicsuffix.org/list/public_suffix_list.dat
         get() = idn?.publicSuffix().toString()
 
-
     val domain: String
         get() = uri.host
                 .replace("." + suffix, "")
@@ -111,7 +110,6 @@ class KrawlUrl private constructor(url: String) {
                 .replace("." + domain, "")
 
     val path: String = uri.path ?: ""
-
 
     override fun toString(): String = canonicalForm
 

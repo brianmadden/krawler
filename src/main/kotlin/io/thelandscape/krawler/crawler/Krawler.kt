@@ -1,5 +1,6 @@
 package io.thelandscape.krawler.crawler
 
+import io.thelandscape.krawler.crawler.Frontier.krawlFrontier
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueDao
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
 import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
@@ -12,6 +13,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
+import kotlin.concurrent.thread
 import kotlin.concurrent.write
 
 /**
@@ -40,7 +42,8 @@ import kotlin.concurrent.write
  *
  */
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
-                       private val queue: KrawlQueueIf = KrawlQueueDao) {
+                       private val queue: KrawlQueueIf = KrawlQueueDao,
+                       private val threadpool: ExecutorService = Executors.newFixedThreadPool(config.numThreads)) {
 
     /**
      * Override this function to determine if a URL should be visited.
@@ -104,10 +107,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * Function is called if a link to a previously visited page is found.
      * This can be overridden to take action when a URL has been seen multiple times.
      *
-     * @param sourceUrl KrawlUrl: URL of the source page
-     * @param destinationUrl KrawlUrl: The URL of the destination
+     * @param url KrawlUrl: URL of the source page
      */
-    open protected fun onDuplicateVisit(sourceUrl: KrawlUrl, destinationUrl: KrawlUrl) {
+    open protected fun onDuplicateVisit(url: KrawlUrl) {
         return
     }
 
@@ -115,8 +117,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
     fun start(seedUrl: String) = start(listOf(seedUrl))
 
-    fun start(seedUrl: List<String>,
-              threadpool: ExecutorService = Executors.newFixedThreadPool(config.numThreads)) {
+    fun start(seedUrl: List<String>) {
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
@@ -126,9 +127,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         (0..config.numThreads - 1).forEach { threadpool.submit { doCrawl() } }
     }
 
-    fun stop() { TODO() }
+    fun stop() = threadpool.shutdown()
 
-    fun shutdown() { TODO() }
+    fun shutdown() = threadpool.shutdownNow()
 
     /**
      * Private members
@@ -194,6 +195,12 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             val domainCount = domainVisitCounts.getOrElse(krawlUrl.domain, { 0 })
             if (domainCount >= config.domainTotalPages)
                 break
+
+            // If it's a duplicate keep moving
+            if (krawlFrontier.verifyUnique(krawlUrl)) {
+                onDuplicateVisit(krawlUrl)
+                continue
+            }
 
             // Increment the domain visit count
             domainVisitCounts[krawlUrl.domain] = domainCount + 1
