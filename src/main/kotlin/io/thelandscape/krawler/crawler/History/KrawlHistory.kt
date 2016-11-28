@@ -1,4 +1,4 @@
-package io.thelandscape.krawler.crawler.Frontier
+package io.thelandscape.krawler.crawler.History
 
 import io.thelandscape.krawler.hsqlSession
 import io.thelandscape.krawler.http.KrawlUrl
@@ -22,7 +22,7 @@ import java.time.LocalDateTime
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-interface KrawlFrontierIf {
+interface KrawlHistoryIf {
     /**
      * Verifies that a URL has not previously been visited.
      *
@@ -43,4 +43,4 @@ interface KrawlFrontierIf {
 }
 
 // Instantiate the KrawlFrontier with the default DAO
-internal val krawlFrontier = KrawlFrontierHSQLDao(hsqlSession)
+internal val krawlHistory = KrawlHistoryHSQLDao(hsqlSession)

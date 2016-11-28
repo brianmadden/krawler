@@ -1,4 +1,4 @@
-package io.thelandscape.krawler.crawler.Frontier
+package io.thelandscape.krawler.crawler.History
 
 import com.github.andrewoma.kwery.core.Session
 import com.github.andrewoma.kwery.mapper.*
@@ -24,24 +24,34 @@ import java.time.LocalDateTime
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-object krawlFrontierTable : Table<KrawlHistoryEntry, String>("krawlHistory",
+object krawlFrontierTable : Table<KrawlHistoryEntry, Long>("krawlHistory",
         TableConfiguration(standardDefaults + timeDefaults,
                 standardConverters + timeConverters, camelToLowerUnderscore)) {
 
-    val Url by col(KrawlHistoryEntry::url, id = true)
+    val Id by col(KrawlHistoryEntry::id, id = true)
+    val Url by col(KrawlHistoryEntry::url)
     val Timestamp by col(KrawlHistoryEntry::timestamp)
 
-    override fun idColumns(id: String) = setOf(Url of id)
+    override fun idColumns(id: Long) = setOf(Id of id)
 
-    override fun create(value: Value<KrawlHistoryEntry>) = KrawlHistoryEntry(value of Url, value of Timestamp)
+    override fun create(value: Value<KrawlHistoryEntry>) =
+            KrawlHistoryEntry(value of Id, value of Url, value of Timestamp)
 
 }
 
 /**
  * KrawlFrontier HSQL Dao
  */
-class KrawlFrontierHSQLDao(session: Session):
-        KrawlFrontierIf, AbstractDao<KrawlHistoryEntry, String>(session, krawlFrontierTable, KrawlHistoryEntry::url) {
+class KrawlHistoryHSQLDao(session: Session):
+        KrawlHistoryIf,
+        AbstractDao<KrawlHistoryEntry, Long>(session,
+                krawlFrontierTable, KrawlHistoryEntry::id, defaultIdStrategy = IdStrategy.Generated) {
+
+    init {
+        // Create queue table
+        session.update("CREATE TABLE IF NOT EXISTS krawlHistory " +
+                "(id INT IDENTITY, url VARCHAR(255), timestamp TIMESTAMP)")
+    }
 
     override fun clearHistory(beforeTime: LocalDateTime): Int {
         val params = mapOf("timestamp" to beforeTime)
@@ -51,10 +61,10 @@ class KrawlFrontierHSQLDao(session: Session):
     }
 
     override fun verifyUnique(url: KrawlUrl): Boolean {
-        val params = mapOf("url" to url.normalForm)
+        val params = mapOf("url" to url.canonicalForm)
         val res = session.select("SELECT COUNT(*) FROM ${table.name} WHERE url = :url",
                 params, mapper = { it.resultSet.getLong(0) })
 
-        return res.first() > 0
+        return res.first() == 0L
     }
 }

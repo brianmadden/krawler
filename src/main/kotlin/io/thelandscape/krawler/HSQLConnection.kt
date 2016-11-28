@@ -41,3 +41,8 @@ private class HSQLConnection(fileBacked: Boolean, fileName: String = ".krawl_tmp
 
 private val connection = HSQLConnection(false).cpds
 internal val hsqlSession: ThreadLocalSession = ThreadLocalSession(connection, HsqlDialect())
+
+// Create tables here so that they're executed in the correct order
+val x  = hsqlSession.update("CREATE TABLE IF NOT EXISTS krawlHistory (url VARCHAR(255), timestamp TIMESTAMP)")
+val y = hsqlSession.update("CREATE TABLE IF NOT EXISTS krawlQueue (url VARCHAR(255) NOT NULL PRIMARY KEY, " +
+"parent INT, depth INT, timestamp TIMESTAMP) FOREIGN KEY (parentId) REFERENCES krawlHistory(id)")

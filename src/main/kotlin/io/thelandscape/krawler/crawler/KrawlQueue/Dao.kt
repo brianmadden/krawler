@@ -3,6 +3,7 @@ package io.thelandscape.krawler.crawler.KrawlQueue
 import com.github.andrewoma.kwery.core.Session
 import com.github.andrewoma.kwery.mapper.*
 import com.github.andrewoma.kwery.mapper.util.camelToLowerUnderscore
+import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.hsqlSession
 
 /**
@@ -23,17 +24,22 @@ import io.thelandscape.krawler.hsqlSession
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+object historyConverter :
+        SimpleConverter<KrawlHistoryEntry>( { row, c -> KrawlHistoryEntry(row.long(c)) }, KrawlHistoryEntry::id)
 
-object krawlQueueTable : Table<QueueEntry, String>("krawlQueue", TableConfiguration(standardDefaults + timeDefaults,
-        standardConverters + timeConverters, camelToLowerUnderscore)) {
+object krawlQueueTable : Table<QueueEntry, String>("krawlQueue",
+        TableConfiguration(standardDefaults + timeDefaults + reifiedValue(KrawlHistoryEntry()),
+                standardConverters + timeConverters + reifiedConverter(historyConverter), camelToLowerUnderscore)) {
 
     val Url by col(QueueEntry::url, id = true)
+    val Parent by col (QueueEntry::parent)
     val Depth by col(QueueEntry::depth)
     val Timestamp by col(QueueEntry::timestamp)
 
     override fun idColumns(id: String) = setOf(Url of id)
 
-    override fun create(value: Value<QueueEntry>) = QueueEntry(value of Url, value of Depth, value of Timestamp)
+    override fun create(value: Value<QueueEntry>) =
+            QueueEntry(value of Url, value of Parent, value of Depth, value of Timestamp)
 
 }
 
@@ -44,9 +50,10 @@ class KrawlQueueHSQLDao(session: Session):
 
     init {
         // Create queue table
-        session.update("CREATE TABLE IF NOT EXISTS krawlQueue" +
-                "(url VARCHAR(255) NOT NULL PRIMARY KEY, depth INT, timestamp TIMESTAMP)")
+        session.update("CREATE TABLE IF NOT EXISTS krawlQueue " +
+                "(url VARCHAR(255) NOT NULL PRIMARY KEY, parent INT, depth INT, timestamp TIMESTAMP)")
     }
+
 
     override fun pop(): QueueEntry? {
         return pop(1).firstOrNull()

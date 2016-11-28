@@ -1,5 +1,6 @@
 package io.thelandscape.krawler.crawler.KrawlQueue
 
+import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import java.time.LocalDateTime
 
 /**
@@ -21,5 +22,6 @@ import java.time.LocalDateTime
  */
 
 data class QueueEntry(val url: String,
-                      val depth: Int,
+                      val parent: KrawlHistoryEntry = KrawlHistoryEntry(),
+                      val depth: Int = 0,
                       val timestamp: LocalDateTime = LocalDateTime.now())

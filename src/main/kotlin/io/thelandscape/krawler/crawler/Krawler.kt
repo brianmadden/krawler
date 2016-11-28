@@ -1,6 +1,7 @@
 package io.thelandscape.krawler.crawler
 
-import io.thelandscape.krawler.crawler.Frontier.krawlFrontier
+import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
+import io.thelandscape.krawler.crawler.History.krawlHistory
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueDao
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
 import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
@@ -8,12 +9,12 @@ import io.thelandscape.krawler.http.ContentFetchError
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.Request
+import java.time.LocalDateTime
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
-import kotlin.concurrent.thread
 import kotlin.concurrent.write
 
 /**
@@ -104,12 +105,13 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     }
 
     /**
-     * Function is called if a link to a previously visited page is found.
+     * Function is called if a link to a previously visited page is scheduled to be crawled.
      * This can be overridden to take action when a URL has been seen multiple times.
      *
-     * @param url KrawlUrl: URL of the source page
+     * @param url KrawlUrl: URL of the page to visit
+     * @param parent KrawlUrl: The URL of the parent page
      */
-    open protected fun onDuplicateVisit(url: KrawlUrl) {
+    open protected fun onRepeatVisit(url: KrawlUrl, parent: KrawlUrl) {
         return
     }
 
@@ -122,9 +124,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
         // Insert the seeds
-        queue.push(krawlUrls.map{ QueueEntry(it.canonicalForm, 0) })
+        queue.push(krawlUrls.map{ QueueEntry(it.canonicalForm) })
 
-        (0..config.numThreads - 1).forEach { threadpool.submit { doCrawl() } }
+        (1..config.numThreads).forEach { threadpool.submit { doCrawl() } }
     }
 
     fun stop() = threadpool.shutdown()
@@ -164,7 +166,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             if (qe == null) {
 
                 // Wait for the configured period for more URLs
-                while(emptyQueueWaitCount < config.emptyQueueWait) {
+                while (emptyQueueWaitCount < config.emptyQueueWait) {
                     Thread.sleep(1000)
                     emptyQueueWaitCount++
 
@@ -186,34 +188,38 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             val krawlUrl: KrawlUrl = KrawlUrl.new(qe!!.url)
             val depth: Int = qe.depth
 
+            val parent: KrawlUrl = KrawlUrl.new(qe.parent.url)
+
             // Make sure we're within depth limit
             if (depth >= config.maxDepth)
-                break
+                continue
 
             // Make sure we're within domain limits
-            // TODO: Fix race condition where you can crawl config.numThreads extra pages per domain
             val domainCount = domainVisitCounts.getOrElse(krawlUrl.domain, { 0 })
             if (domainCount >= config.domainTotalPages)
-                break
-
-            // If it's a duplicate keep moving
-            if (krawlFrontier.verifyUnique(krawlUrl)) {
-                onDuplicateVisit(krawlUrl)
                 continue
-            }
 
-            // Increment the domain visit count
-            domainVisitCounts[krawlUrl.domain] = domainCount + 1
+            val history: KrawlHistoryEntry =
+                    if (krawlHistory.verifyUnique(krawlUrl)) { // If it's a new URL add it to the history
+                        krawlHistory.insert(KrawlHistoryEntry(-1, krawlUrl.canonicalForm, LocalDateTime.now()))
+                    } else { // If it's a dupe, move on
+                        onRepeatVisit(krawlUrl, parent)
+                        continue
+            }
 
             // If we're supposed to visit this, get the HTML and call visit
             if (shouldVisit(krawlUrl)) {
+
+                // Increment the domain visit count
+                domainVisitCounts[krawlUrl.domain] = domainCount + 1
+
                 val doc: KrawlDocument = Request.getUrl(krawlUrl)
 
                 // Parse out the URLs and construct queue entries from them
                 val links: List<QueueEntry> = doc.anchorTags
                         .map { KrawlUrl.new(it) }
                         .filterNotNull()
-                        .map { QueueEntry(it.canonicalForm, depth + 1) }
+                        .map { QueueEntry(it.canonicalForm, history, depth + 1) }
 
                 // Insert the URLs to the queue now
                 queue.push(links)
@@ -224,10 +230,13 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             // If we're supposed to check this, get the status code and call check
             if (shouldCheck(krawlUrl)) {
+
+                // Increment the domain visit count
+                domainVisitCounts[krawlUrl.domain] = domainCount + 1
+
                 val code: Int = Request.checkUrl(krawlUrl)
                 check(krawlUrl, code)
             }
         }
     }
-
 }

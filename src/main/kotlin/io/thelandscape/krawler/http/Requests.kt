@@ -1,5 +1,6 @@
 package io.thelandscape.krawler.http
 
+import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import org.apache.http.HttpResponse
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.client.methods.HttpHead

@@ -1,4 +1,4 @@
-package io.thelandscape.krawler.crawler.Frontier
+package io.thelandscape.krawler.crawler.History
 
 import java.time.LocalDateTime
 
@@ -20,5 +20,6 @@ import java.time.LocalDateTime
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-data class KrawlHistoryEntry(val url: String,
-                             val timestamp: LocalDateTime = LocalDateTime.now())
+data class KrawlHistoryEntry(val id: Long = -1,
+                             val url: String = "",
+                             val timestamp: LocalDateTime = LocalDateTime.MIN)

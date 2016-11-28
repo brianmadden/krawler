@@ -19,6 +19,7 @@
 import com.github.andrewoma.kwery.core.DefaultSession
 import com.github.andrewoma.kwery.core.Session
 import com.github.andrewoma.kwery.core.dialect.HsqlDialect
+import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueHSQLDao
 import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
 import org.junit.After
@@ -39,34 +40,47 @@ class KrawlQueueHSQLDaoTest {
 
     val dao: KrawlQueueHSQLDao = KrawlQueueHSQLDao(session)
 
+    @Before fun setUp() {
+        session.update("CREATE TABLE IF NOT EXISTS krawlHistory " +
+                "(id INT IDENTITY, url VARCHAR(255), timestamp TIMESTAMP)")
+        session.update("CREATE TABLE IF NOT EXISTS krawlQueue " +
+                "(url VARCHAR(255) NOT NULL PRIMARY KEY, parent INT, depth INT, timestamp TIMESTAMP)")
+
+    }
+
     @Test fun testPush() {
         val urls: List<QueueEntry> = listOf(
-                QueueEntry("http://www.google.com", 0),
-                QueueEntry("http://www.a.com", 0),
-                QueueEntry("http://www.b.com", 1))
+                QueueEntry("http://www.google.com"),
+                QueueEntry("http://www.a.com"),
+                QueueEntry("http://www.b.com", KrawlHistoryEntry(0, "http://www.a.com"), 1))
         val res = dao.push(urls)
         assertTrue { res.isNotEmpty() }
 
     }
 
     @Test fun testPop() {
+        val noParent = KrawlHistoryEntry()
+        val zParent = KrawlHistoryEntry(0, "http://www.y.com")
         val list = listOf(
-                QueueEntry("http://www.x.com", 0),
-                QueueEntry("http://www.y.com", 0),
-                QueueEntry("http://www.z.com", 1))
+                QueueEntry("http://www.x.com", noParent),
+                QueueEntry("http://www.y.com", noParent),
+                QueueEntry("http://www.z.com", zParent, 1))
         dao.push(list)
 
         var popped = dao.pop()
         assertNotNull( popped )
         assertEquals("http://www.x.com", popped?.url)
+        assertEquals(noParent, popped?.parent)
 
         popped = dao.pop()
         assertNotNull( popped )
         assertEquals("http://www.y.com", popped?.url)
+        assertEquals(noParent, popped?.parent)
 
         popped = dao.pop()
         assertNotNull( popped )
         assertEquals("http://www.z.com", popped?.url)
+        assertEquals(zParent, popped?.parent)
 
         popped = dao.pop()
         assertNull( popped )

@@ -28,6 +28,16 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 class KrawlDocument(private val response: HttpResponse) {
 
+    constructor(response: HttpResponse, parent: KrawlUrl): this(response) {
+        this.parent = parent
+    }
+
+    /**
+     * URL of the parent of this page
+     */
+    var parent: KrawlUrl? = null
+        get() = field
+        private set(value) { field = value }
     /**
      * Http headers
      */
