@@ -24,7 +24,7 @@ import java.time.LocalDateTime
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-object krawlFrontierTable : Table<KrawlHistoryEntry, Long>("krawlHistory",
+object krawlHistoryTable : Table<KrawlHistoryEntry, Long>("krawlHistory",
         TableConfiguration(standardDefaults + timeDefaults,
                 standardConverters + timeConverters, camelToLowerUnderscore)) {
 
@@ -45,7 +45,7 @@ object krawlFrontierTable : Table<KrawlHistoryEntry, Long>("krawlHistory",
 class KrawlHistoryHSQLDao(session: Session):
         KrawlHistoryIf,
         AbstractDao<KrawlHistoryEntry, Long>(session,
-                krawlFrontierTable, KrawlHistoryEntry::id, defaultIdStrategy = IdStrategy.Generated) {
+                krawlHistoryTable, KrawlHistoryEntry::id, defaultIdStrategy = IdStrategy.Generated) {
 
     init {
         // Create queue table

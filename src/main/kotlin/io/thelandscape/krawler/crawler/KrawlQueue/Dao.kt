@@ -1,9 +1,14 @@
 package io.thelandscape.krawler.crawler.KrawlQueue
 
 import com.github.andrewoma.kwery.core.Session
+import com.github.andrewoma.kwery.fetcher.GraphFetcher
+import com.github.andrewoma.kwery.fetcher.Node
+import com.github.andrewoma.kwery.fetcher.Property
+import com.github.andrewoma.kwery.fetcher.Type
 import com.github.andrewoma.kwery.mapper.*
 import com.github.andrewoma.kwery.mapper.util.camelToLowerUnderscore
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
+import io.thelandscape.krawler.crawler.History.krawlHistory
 import io.thelandscape.krawler.hsqlSession
 
 /**
@@ -54,9 +59,20 @@ class KrawlQueueHSQLDao(session: Session):
                 "(url VARCHAR(255) NOT NULL PRIMARY KEY, parent INT, depth INT, timestamp TIMESTAMP)")
     }
 
-
     override fun pop(): QueueEntry? {
-        return pop(1).firstOrNull()
+
+        val historyEntry = Type(KrawlHistoryEntry::id, { krawlHistory.findByIds(it) })
+        val queueEntry = Type(QueueEntry::url, { this.pop(1) },
+                Property(QueueEntry::parent,  historyEntry,
+                        { it.parent.id }, { hist, parent -> hist.copy( parent = parent) })
+        )
+
+        val fetcher: GraphFetcher = GraphFetcher((setOf(historyEntry, queueEntry)))
+
+        fun <T> Collection<T>.fetch(node: Node) = fetcher.fetch(this, Node(node))
+
+
+        return pop(1).fetch(Node.all).firstOrNull()
     }
 
     private fun pop(n: Int): List<QueueEntry> {
