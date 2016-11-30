@@ -22,4 +22,4 @@ import java.time.LocalDateTime
 
 data class KrawlHistoryEntry(val id: Long = -1,
                              val url: String = "",
-                             val timestamp: LocalDateTime = LocalDateTime.MIN)
+                             val timestamp: LocalDateTime = LocalDateTime.of(2000,1,1,0,0))
