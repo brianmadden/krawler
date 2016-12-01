@@ -25,9 +25,9 @@ dependencies {
     compile "org.apache.httpcomponents:httpclient:4.5.2"
     compile group: "org.hsqldb", name: "hsqldb", version: "2.3.4"
 
-    compile group: "org.apache.logging.log4j", name: "log4j-api", version: "2.6.2"
-    compile group: "org.apache.logging.log4j", name: "log4j-core", version: "2.6.2"
-    compile group: "org.apache.logging.log4j", name: "log4j-slf4j-impl", version: "2.6.2"
+    compile group: "org.apache.logging.log4j", name: "log4j-api", version: "2.7"
+    compile group: "org.apache.logging.log4j", name: "log4j-core", version: "2.7"
+    compile group: "org.apache.logging.log4j", name: "log4j-slf4j-impl", version: "2.7"
 
     compile "com.github.andrewoma.kwery:core:0.15"
     compile "com.github.andrewoma.kwery:fetcher:0.15"

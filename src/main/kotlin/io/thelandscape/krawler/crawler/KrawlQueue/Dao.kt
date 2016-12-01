@@ -62,12 +62,13 @@ class KrawlQueueHSQLDao(session: Session):
     override fun pop(): QueueEntry? {
 
         val historyEntry = Type(KrawlHistoryEntry::id, { krawlHistory.findByIds(it) })
+
         val queueEntry = Type(QueueEntry::url, { this.findByIds(it) },
                 listOf(Property(QueueEntry::parent,  historyEntry,
-                        { it.parent.id }, { c, t -> c.copy( parent = t) }))
+                        { it.parent.id }, { c, t -> c.copy(parent = t) }))
         )
 
-        val fetcher: GraphFetcher = GraphFetcher((setOf(historyEntry, queueEntry)))
+        val fetcher: GraphFetcher = GraphFetcher((setOf(queueEntry, historyEntry)))
 
         fun <T> Collection<T>.fetch(node: Node) = fetcher.fetch(this, Node(node))
 

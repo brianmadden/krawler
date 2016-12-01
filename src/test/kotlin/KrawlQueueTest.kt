@@ -19,6 +19,8 @@
 import com.github.andrewoma.kwery.core.DefaultSession
 import com.github.andrewoma.kwery.core.Session
 import com.github.andrewoma.kwery.core.dialect.HsqlDialect
+import com.github.andrewoma.kwery.core.interceptor.LoggingInterceptor
+import com.github.andrewoma.kwery.core.interceptor.LoggingSummaryInterceptor
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.History.KrawlHistoryHSQLDao
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueHSQLDao
@@ -38,14 +40,17 @@ import kotlin.test.assertTrue
 class KrawlQueueHSQLDaoTest {
 
     val connection: Connection = DriverManager.getConnection("jdbc:hsqldb:mem:testdb", "", "")
-    val session: Session = DefaultSession(connection, HsqlDialect())
+    val session: Session = DefaultSession(connection, HsqlDialect(), LoggingInterceptor())
 
     val dao: KrawlQueueHSQLDao = KrawlQueueHSQLDao(session)
     val histDao: KrawlHistoryHSQLDao = KrawlHistoryHSQLDao(session)
 
     @Before fun setUp() {
+        session.update("DROP TABLE krawlHistory")
         session.update("CREATE TABLE IF NOT EXISTS krawlHistory " +
                 "(id INT IDENTITY, url VARCHAR(255), timestamp TIMESTAMP)")
+
+        session.update("DROP TABLE krawlQueue")
         session.update("CREATE TABLE IF NOT EXISTS krawlQueue " +
                 "(url VARCHAR(255) NOT NULL PRIMARY KEY, parent INT, depth INT, timestamp TIMESTAMP)")
 
@@ -63,9 +68,7 @@ class KrawlQueueHSQLDaoTest {
 
     @Test fun testPop() {
         val noParent = KrawlHistoryEntry()
-        val zParent = KrawlHistoryEntry(0, "http://www.y.com", LocalDateTime.now())
-
-        histDao.insert(zParent)
+        val zParent = histDao.insert(KrawlHistoryEntry(-1, "http://www.y.com", LocalDateTime.now()))
 
         val list = listOf(
                 QueueEntry("http://www.x.com", noParent),
