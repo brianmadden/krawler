@@ -20,12 +20,10 @@ import com.github.andrewoma.kwery.core.DefaultSession
 import com.github.andrewoma.kwery.core.Session
 import com.github.andrewoma.kwery.core.dialect.HsqlDialect
 import com.github.andrewoma.kwery.core.interceptor.LoggingInterceptor
-import com.github.andrewoma.kwery.core.interceptor.LoggingSummaryInterceptor
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.History.KrawlHistoryHSQLDao
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueHSQLDao
 import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
-import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import java.sql.Connection
@@ -42,8 +40,8 @@ class KrawlQueueHSQLDaoTest {
     val connection: Connection = DriverManager.getConnection("jdbc:hsqldb:mem:testdb", "", "")
     val session: Session = DefaultSession(connection, HsqlDialect(), LoggingInterceptor())
 
-    val dao: KrawlQueueHSQLDao = KrawlQueueHSQLDao(session)
     val histDao: KrawlHistoryHSQLDao = KrawlHistoryHSQLDao(session)
+    val dao: KrawlQueueHSQLDao = KrawlQueueHSQLDao(session, histDao)
 
     @Before fun setUp() {
         session.update("DROP TABLE krawlHistory")

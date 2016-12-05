@@ -1,13 +1,12 @@
 package io.thelandscape.krawler.crawler.KrawlQueue
 
 import com.github.andrewoma.kwery.core.Session
-import com.github.andrewoma.kwery.fetcher.GraphFetcher
-import com.github.andrewoma.kwery.fetcher.Node
-import com.github.andrewoma.kwery.fetcher.Property
-import com.github.andrewoma.kwery.fetcher.Type
+import com.github.andrewoma.kwery.fetcher.*
 import com.github.andrewoma.kwery.mapper.*
+import com.github.andrewoma.kwery.mapper.Value
 import com.github.andrewoma.kwery.mapper.util.camelToLowerUnderscore
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
+import io.thelandscape.krawler.crawler.History.KrawlHistoryHSQLDao
 import io.thelandscape.krawler.crawler.History.krawlHistory
 import io.thelandscape.krawler.hsqlSession
 
@@ -53,6 +52,13 @@ internal val KrawlQueueDao = KrawlQueueHSQLDao(hsqlSession)
 class KrawlQueueHSQLDao(session: Session):
         KrawlQueueIf, AbstractDao<QueueEntry, String>(session, krawlQueueTable, QueueEntry::url) {
 
+    private var histDao: KrawlHistoryHSQLDao = krawlHistory
+        private set(value) { field = value }
+
+    constructor(session: Session, histDao: KrawlHistoryHSQLDao): this(session) {
+        this.histDao = histDao
+    }
+
     init {
         // Create queue table
         session.update("CREATE TABLE IF NOT EXISTS krawlQueue " +
@@ -60,15 +66,13 @@ class KrawlQueueHSQLDao(session: Session):
     }
 
     override fun pop(): QueueEntry? {
+        val historyEntry = Type(KrawlHistoryEntry::id, { histDao.findByIds(it) })
+        val queueEntry = Type(
+                QueueEntry::url,
+                { this.findByIds(it) },
+                listOf(Property(QueueEntry::parent,  historyEntry, { it.parent.id }, { c, t -> c.copy(parent = t) })))
 
-        val historyEntry = Type(KrawlHistoryEntry::id, { krawlHistory.findByIds(it) })
-
-        val queueEntry = Type(QueueEntry::url, { this.findByIds(it) },
-                listOf(Property(QueueEntry::parent,  historyEntry,
-                        { it.parent.id }, { c, t -> c.copy(parent = t) }))
-        )
-
-        val fetcher: GraphFetcher = GraphFetcher((setOf(queueEntry, historyEntry)))
+        val fetcher: GraphFetcher = GraphFetcher(setOf(queueEntry, historyEntry))
 
         fun <T> Collection<T>.fetch(node: Node) = fetcher.fetch(this, Node(node))
 
@@ -82,8 +86,9 @@ class KrawlQueueHSQLDao(session: Session):
 
         var out: List<QueueEntry> = listOf()
         session.transaction {
-            out = session.select(selectSql, params, options("popMinDepth"), table.rowMapper())
-            session.update("DELETE FROM ${table.name} WHERE 1 = 1 LIMIT $n")
+            out = session.select(selectSql, params, mapper = table.rowMapper())
+            session.update("DELETE FROM ${table.name} WHERE url IN (:ids)",
+                    mapOf("ids" to out.map{ it.url }.joinToString(",")))
         }
 
         return out
