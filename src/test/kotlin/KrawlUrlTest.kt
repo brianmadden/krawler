@@ -1,13 +1,3 @@
-import io.thelandscape.krawler.http.KrawlUrl
-import org.junit.Test
-import org.w3c.dom.Element
-import java.io.ByteArrayInputStream
-import javax.xml.parsers.DocumentBuilderFactory
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
-
-
 /**
  * Created by brian.a.madden@gmail.com on 10/21/16.
  *
@@ -25,6 +15,15 @@ import kotlin.test.assertTrue
  * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+
+import io.thelandscape.krawler.http.KrawlUrl
+import org.junit.Test
+import org.w3c.dom.Element
+import java.io.ByteArrayInputStream
+import javax.xml.parsers.DocumentBuilderFactory
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class KrawlUrlTest {
 

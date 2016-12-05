@@ -1,13 +1,3 @@
-import io.thelandscape.krawler.http.KrawlDocument
-import org.apache.http.HttpResponse
-import org.apache.http.ProtocolVersion
-import org.apache.http.entity.StringEntity
-import org.apache.http.message.BasicHttpResponse
-import org.apache.http.message.BasicStatusLine
-import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
-
 /**
  * Created by brian.a.madden@gmail.com on 10/26/16.
  *
@@ -25,6 +15,16 @@ import kotlin.test.assertTrue
  * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+
+import io.thelandscape.krawler.http.KrawlDocument
+import org.apache.http.HttpResponse
+import org.apache.http.ProtocolVersion
+import org.apache.http.entity.StringEntity
+import org.apache.http.message.BasicHttpResponse
+import org.apache.http.message.BasicStatusLine
+import org.junit.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 private fun prepareResponse(expectedResponseCode: Int, responseBody: String): HttpResponse {
     val ret = BasicHttpResponse(

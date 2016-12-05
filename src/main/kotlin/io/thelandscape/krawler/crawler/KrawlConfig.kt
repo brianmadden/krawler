@@ -1,5 +1,3 @@
-package io.thelandscape.krawler.crawler
-
 /**
  * Created by brian.a.madden@gmail.com on 10/31/16.
  *
@@ -18,7 +16,9 @@ package io.thelandscape.krawler.crawler
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-data class KrawlConfig(
+package io.thelandscape.krawler.crawler
+
+class KrawlConfig(
         // Size of crawler threadpool
         // Default: -1 (unlimited)
         val numThreads: Int = 1,
@@ -42,5 +42,9 @@ data class KrawlConfig(
         // Directory where KrawlQueue will be persisted
         val crawlDirectory: String = ".krawl",
         // Length of time to sleep when queue becomes empty
-        val emptyQueueWait: Int = 10
-)
+        emptyQueueWaitTime: Int = 10
+) {
+    // Length of time to sleep when queue becomes empty
+    val emptyQueueWaitTime: Int = emptyQueueWaitTime
+        get() = if (field <= 0) 1 else field
+}

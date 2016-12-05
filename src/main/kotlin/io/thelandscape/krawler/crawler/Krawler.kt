@@ -1,3 +1,21 @@
+/**
+ * Created by brian.a.madden@gmail.com on 10/26/16.
+ *
+ * Copyright (c) <2016> <H, llc>
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+ * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+ * WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 package io.thelandscape.krawler.crawler
 
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
@@ -16,24 +34,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
-
-/**
- * Created by brian.a.madden@gmail.com on 10/26/16.
- *
- * Copyright (c) <2016> <H, llc>
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
- * WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
 
 /**
  * Class defines the operations and data structures used to perform a web crawl.
@@ -131,7 +131,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
     fun stop() = threadpool.shutdown()
 
-    fun shutdown() = threadpool.shutdownNow()
+    fun shutdown(): MutableList<Runnable> = threadpool.shutdownNow()
 
     /**
      * Private members
@@ -151,7 +151,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
     val domainVisitCounts: MutableMap<String, Int> = ConcurrentHashMap()
 
-    private fun doCrawl() {
+    internal fun doCrawl() {
 
         var emptyQueueWaitCount: Int = 0
 
@@ -166,7 +166,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             if (qe == null) {
 
                 // Wait for the configured period for more URLs
-                while (emptyQueueWaitCount < config.emptyQueueWait) {
+                while (emptyQueueWaitCount < config.emptyQueueWaitTime) {
                     Thread.sleep(1000)
                     emptyQueueWaitCount++
 
@@ -180,7 +180,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                     }
 
                     // If we've hit the limit, time to quit
-                    if (emptyQueueWaitCount == config.emptyQueueWait)
+                    if (emptyQueueWaitCount == config.emptyQueueWaitTime)
                         return
                 }
             }
