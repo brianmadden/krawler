@@ -1,9 +1,3 @@
-package io.thelandscape.krawler.crawler.History
-
-import io.thelandscape.krawler.hsqlSession
-import io.thelandscape.krawler.http.KrawlUrl
-import java.time.LocalDateTime
-
 /**
  * Created by brian.a.madden@gmail.com on 11/24/16.
  *
@@ -22,7 +16,23 @@ import java.time.LocalDateTime
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+package io.thelandscape.krawler.crawler.History
+
+import io.thelandscape.krawler.hsqlSession
+import io.thelandscape.krawler.http.KrawlUrl
+import java.time.LocalDateTime
+
 interface KrawlHistoryIf {
+
+    /**
+     * Inserts an entry into the history tracker
+     *
+     * @param url KrawlUrl: The KrawlUrl to insert
+     *
+     * @returns KrawlHistoryEntry that was inserted into the history store with generated ID
+     */
+    fun insert(url: KrawlUrl): KrawlHistoryEntry
+
     /**
      * Verifies that a URL has not previously been visited.
      *

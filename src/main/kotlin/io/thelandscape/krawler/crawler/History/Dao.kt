@@ -53,6 +53,10 @@ class KrawlHistoryHSQLDao(session: Session):
                 "(id INT IDENTITY, url VARCHAR(255), timestamp TIMESTAMP)")
     }
 
+    override fun insert(url: KrawlUrl): KrawlHistoryEntry {
+        return insert(KrawlHistoryEntry(-1, url.canonicalForm, LocalDateTime.now()))
+    }
+
     override fun clearHistory(beforeTime: LocalDateTime): Int {
         val params = mapOf("timestamp" to beforeTime)
         val res = session.update("DELETE FROM ${table.name} WHERE timestamp = :timestamp", params)

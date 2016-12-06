@@ -46,6 +46,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                        private val queue: KrawlQueueIf = KrawlQueueDao,
                        private val threadpool: ExecutorService = Executors.newFixedThreadPool(config.numThreads)) {
 
+    // TODO: Inject the history DAO as well
+
     /**
      * Override this function to determine if a URL should be visited.
      * Visiting a URL will issue an HTTP GET request.
@@ -191,17 +193,19 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             val parent: KrawlUrl = KrawlUrl.new(qe.parent.url)
 
             // Make sure we're within depth limit
-            if (depth >= config.maxDepth)
+            val maxDepth: Int = config.maxDepth
+            if (depth >= maxDepth && maxDepth != -1)
                 continue
 
             // Make sure we're within domain limits
             val domainCount = domainVisitCounts.getOrElse(krawlUrl.domain, { 0 })
-            if (domainCount >= config.domainTotalPages)
+            val domainTotalPages = config.domainTotalPages
+            if (domainCount >= domainTotalPages && domainTotalPages != -1)
                 continue
 
             val history: KrawlHistoryEntry =
                     if (krawlHistory.verifyUnique(krawlUrl)) { // If it's a new URL add it to the history
-                        krawlHistory.insert(KrawlHistoryEntry(-1, krawlUrl.canonicalForm, LocalDateTime.now()))
+                        krawlHistory.insert(krawlUrl)
                     } else { // If it's a dupe, move on
                         onRepeatVisit(krawlUrl, parent)
                         continue

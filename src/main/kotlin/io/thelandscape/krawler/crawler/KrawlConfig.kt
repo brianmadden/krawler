@@ -45,6 +45,6 @@ class KrawlConfig(
         emptyQueueWaitTime: Int = 10
 ) {
     // Length of time to sleep when queue becomes empty
-    val emptyQueueWaitTime: Int = emptyQueueWaitTime
-        get() = if (field <= 0) 1 else field
+    var emptyQueueWaitTime: Int = emptyQueueWaitTime
+        private set(value) { field = if (value <= 0) 1 else value }
 }
