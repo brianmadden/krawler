@@ -24,7 +24,7 @@ import java.time.LocalDateTime
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-object krawlHistoryTable : Table<KrawlHistoryEntry, Long>("krawlHistory",
+object krawlHistoryTable : Table<KrawlHistoryEntry, Long>("KrawlHistory",
         TableConfiguration(standardDefaults + timeDefaults,
                 standardConverters + timeConverters, camelToLowerUnderscore)) {
 
@@ -49,7 +49,7 @@ class KrawlHistoryHSQLDao(session: Session):
 
     init {
         // Create queue table
-        session.update("CREATE TABLE IF NOT EXISTS krawlHistory " +
+        session.update("CREATE TABLE IF NOT EXISTS KrawlHistory " +
                 "(id INT IDENTITY, url VARCHAR(255), timestamp TIMESTAMP)")
     }
 

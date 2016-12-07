@@ -53,4 +53,4 @@ interface KrawlHistoryIf {
 }
 
 // Instantiate the KrawlFrontier with the default DAO
-internal val krawlHistory = KrawlHistoryHSQLDao(hsqlSession)
+internal val KrawlHistory = KrawlHistoryHSQLDao(hsqlSession)

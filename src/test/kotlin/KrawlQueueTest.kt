@@ -44,8 +44,8 @@ class KrawlQueueHSQLDaoTest {
     val dao: KrawlQueueHSQLDao = KrawlQueueHSQLDao(session, histDao)
 
     @Before fun setUp() {
-        session.update("DROP TABLE krawlHistory")
-        session.update("CREATE TABLE IF NOT EXISTS krawlHistory " +
+        session.update("DROP TABLE KrawlHistory")
+        session.update("CREATE TABLE IF NOT EXISTS KrawlHistory " +
                 "(id INT IDENTITY, url VARCHAR(255), timestamp TIMESTAMP)")
 
         session.update("DROP TABLE krawlQueue")

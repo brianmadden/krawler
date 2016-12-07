@@ -7,7 +7,7 @@ import com.github.andrewoma.kwery.mapper.Value
 import com.github.andrewoma.kwery.mapper.util.camelToLowerUnderscore
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.History.KrawlHistoryHSQLDao
-import io.thelandscape.krawler.crawler.History.krawlHistory
+import io.thelandscape.krawler.crawler.History.KrawlHistory
 import io.thelandscape.krawler.hsqlSession
 
 /**
@@ -52,7 +52,7 @@ internal val KrawlQueueDao = KrawlQueueHSQLDao(hsqlSession)
 class KrawlQueueHSQLDao(session: Session):
         KrawlQueueIf, AbstractDao<QueueEntry, String>(session, krawlQueueTable, QueueEntry::url) {
 
-    private var histDao: KrawlHistoryHSQLDao = krawlHistory
+    private var histDao: KrawlHistoryHSQLDao = KrawlHistory
         private set(value) { field = value }
 
     constructor(session: Session, histDao: KrawlHistoryHSQLDao): this(session) {

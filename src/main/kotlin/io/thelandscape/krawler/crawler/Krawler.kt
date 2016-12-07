@@ -19,7 +19,8 @@
 package io.thelandscape.krawler.crawler
 
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
-import io.thelandscape.krawler.crawler.History.krawlHistory
+import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
+import io.thelandscape.krawler.crawler.History.KrawlHistory
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueDao
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
 import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
@@ -44,9 +45,8 @@ import kotlin.concurrent.write
  */
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                        private val queue: KrawlQueueIf = KrawlQueueDao,
+                       private val krawlHistory: KrawlHistoryIf = KrawlHistory,
                        private val threadpool: ExecutorService = Executors.newFixedThreadPool(config.numThreads)) {
-
-    // TODO: Inject the history DAO as well
 
     /**
      * Override this function to determine if a URL should be visited.
