@@ -76,7 +76,7 @@ class KrawlUrlTest {
 
     @Test fun testSuffix() = assertEquals("com", testUrl.suffix)
 
-    @Test fun testDomain() = assertEquals("abc", testUrl.domain)
+    @Test fun testDomain() = assertEquals("abc.com", testUrl.domain)
 
     @Test fun testSubdomain() = assertEquals("www.xyz", testUrl.subdomain)
 

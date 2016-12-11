@@ -102,7 +102,7 @@ class KrawlUrl private constructor(url: String) {
         get() = uri.host
                 .replace("." + suffix, "")
                 .split(".")
-                .last()
+                .last() + "." + suffix
 
     val subdomain: String
         get() = uri.host

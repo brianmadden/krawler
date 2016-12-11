@@ -64,10 +64,11 @@ class KrawlHistoryHSQLDao(session: Session):
         return res
     }
 
-    override fun verifyUnique(url: KrawlUrl): Boolean {
+    override fun hasBeenSeen(url: KrawlUrl): Boolean {
         val params = mapOf("url" to url.canonicalForm)
         val res = session.select("SELECT COUNT(*) FROM ${table.name} WHERE url = :url",
                 params, mapper = { it.resultSet.getLong(0) })
+
 
         return res.first() == 0L
     }

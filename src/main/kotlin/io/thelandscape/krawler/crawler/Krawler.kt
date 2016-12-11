@@ -24,10 +24,7 @@ import io.thelandscape.krawler.crawler.History.KrawlHistory
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueDao
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
 import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
-import io.thelandscape.krawler.http.ContentFetchError
-import io.thelandscape.krawler.http.KrawlDocument
-import io.thelandscape.krawler.http.KrawlUrl
-import io.thelandscape.krawler.http.Request
+import io.thelandscape.krawler.http.*
 import java.time.LocalDateTime
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
@@ -46,6 +43,7 @@ import kotlin.concurrent.write
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                        private val queue: KrawlQueueIf = KrawlQueueDao,
                        private val krawlHistory: KrawlHistoryIf = KrawlHistory,
+                       private val requestProvider: RequestProviderIf = Request,
                        private val threadpool: ExecutorService = Executors.newFixedThreadPool(config.numThreads)) {
 
     /**
@@ -204,11 +202,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 continue
 
             val history: KrawlHistoryEntry =
-                    if (krawlHistory.verifyUnique(krawlUrl)) { // If it's a new URL add it to the history
-                        krawlHistory.insert(krawlUrl)
-                    } else { // If it's a dupe, move on
+                    if (krawlHistory.hasBeenSeen(krawlUrl)) { // If it has been seen
                         onRepeatVisit(krawlUrl, parent)
                         continue
+                    } else { // If it
+                        krawlHistory.insert(krawlUrl)
             }
 
             // If we're supposed to visit this, get the HTML and call visit
@@ -216,14 +214,21 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
                 // Increment the domain visit count
                 domainVisitCounts[krawlUrl.domain] = domainCount + 1
+                globalVisitCount += 1
 
-                val doc: KrawlDocument = Request.getUrl(krawlUrl)
+                val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
+
+                // If there was an error on trying to get the doc, call content fetch error
+                if (doc is ErrorResponse || doc !is KrawlDocument) {
+                    onContentFetchError(krawlUrl, ContentFetchError(krawlUrl, UnknownError()))
+                    continue
+                }
 
                 // Parse out the URLs and construct queue entries from them
                 val links: List<QueueEntry> = doc.anchorTags
-                        .map { KrawlUrl.new(it) }
-                        .filterNotNull()
-                        .map { QueueEntry(it.canonicalForm, history, depth + 1) }
+                            .map { KrawlUrl.new(it.getAttribute("href")) }
+                            .filterNotNull()
+                            .map { QueueEntry(it.canonicalForm, history, depth + 1) }
 
                 // Insert the URLs to the queue now
                 queue.push(links)
@@ -237,8 +242,15 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
                 // Increment the domain visit count
                 domainVisitCounts[krawlUrl.domain] = domainCount + 1
+                val doc: RequestResponse = requestProvider.checkUrl(krawlUrl)
 
-                val code: Int = Request.checkUrl(krawlUrl)
+                if (doc is ErrorResponse || doc !is KrawlDocument) {
+                    onContentFetchError(krawlUrl, ContentFetchError(krawlUrl, UnknownError()))
+                    continue
+                }
+
+                val code: Int = doc.statusCode
+
                 check(krawlUrl, code)
             }
         }

@@ -26,7 +26,14 @@ import javax.xml.parsers.DocumentBuilderFactory
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-class KrawlDocument(private val response: HttpResponse) {
+// Only need these once for all documents
+private val dbf = DocumentBuilderFactory.newInstance()
+private val db = dbf.newDocumentBuilder()
+
+interface RequestResponse
+
+class ErrorResponse() : RequestResponse
+class KrawlDocument(private val response: HttpResponse) : RequestResponse {
 
     constructor(response: HttpResponse, parent: KrawlUrl): this(response) {
         this.parent = parent
@@ -47,7 +54,7 @@ class KrawlDocument(private val response: HttpResponse) {
     /**
      * Raw HTML
      */
-    val rawHtml: String = EntityUtils.toString(response.entity)
+    val rawHtml: String = try { EntityUtils.toString(response.entity) ?: "" } catch (e: Throwable) { "" }
 
     /**
      * Status code
@@ -58,13 +65,12 @@ class KrawlDocument(private val response: HttpResponse) {
     /**
      * Anchor tags pulled out
      */
-    private val dbf = DocumentBuilderFactory.newInstance()
-    private val db = dbf.newDocumentBuilder()
     val anchorTags: List<Element>
         get() {
             val parsed: Document = try {
-                db.parse(ByteArrayInputStream(rawHtml.toByteArray()))
-            } catch (e: Exception) {
+                val ba: ByteArrayInputStream = ByteArrayInputStream(rawHtml.toByteArray())
+                db.parse(ba)
+            } catch (e: Throwable) {
                 return listOf()
             }
 
@@ -73,8 +79,11 @@ class KrawlDocument(private val response: HttpResponse) {
 
     /// Utility method to convert a NodeList to a List<Element>
     private fun NodeList.toElementList(): List<Element> {
+        if (this.length == 0) return listOf()
+
         return (0..this.length - 1)
                 .map { this.item(it) }
                 .map { it as Element }
     }
 }
+

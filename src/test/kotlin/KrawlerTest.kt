@@ -17,7 +17,6 @@
  */
 
 import com.nhaarman.mockito_kotlin.*
-import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
 import io.thelandscape.krawler.crawler.KrawlConfig
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
@@ -25,20 +24,39 @@ import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
 import io.thelandscape.krawler.crawler.Krawler
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
+import io.thelandscape.krawler.http.RequestProviderIf
+import org.apache.http.HttpResponse
+import org.junit.Before
 import org.junit.Test
 import java.util.concurrent.ExecutorService
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+
+class MockQueue() : KrawlQueueIf {
+    val back: MutableList<QueueEntry> = mutableListOf()
+
+    override fun pop(): QueueEntry? {
+        return if (back.size > 0) back.removeAt(0) else null
+    }
+
+    override fun push(urls: List<QueueEntry>): List<QueueEntry> {
+        urls.forEach { back.add(back.size, it) }
+        return urls
+    }
+
+}
 
 class KrawlerTest {
 
     val mockConfig = KrawlConfig(emptyQueueWaitTime = 1)
-    val mockQueue = mock<KrawlQueueIf>()
+    val mockQueue = MockQueue()
     val mockHistory = mock<KrawlHistoryIf>()
+    val mockRequests = mock<RequestProviderIf>()
     val mockThreadpool = mock<ExecutorService>()
 
+    val preparedResponse = KrawlDocument(prepareResponse(200, ""))
+
     class testCrawler(x: KrawlConfig, y: KrawlQueueIf,
-                      w: KrawlHistoryIf, z: ExecutorService): Krawler(x, y, w, z) {
+                      w: KrawlHistoryIf, v: RequestProviderIf, z: ExecutorService): Krawler(x, y, w, v, z) {
         override fun shouldVisit(url: KrawlUrl): Boolean {
             return true
         }
@@ -55,7 +73,9 @@ class KrawlerTest {
 
     }
 
-    val testKrawler = testCrawler(mockConfig, mockQueue, mockHistory, mockThreadpool)
+    val testKrawler = testCrawler(mockConfig, mockQueue, mockHistory, mockRequests, mockThreadpool)
+
+    @Before fun setUp() = MockitoKotlin.registerInstanceCreator { KrawlUrl.new("") }
 
     /**
      * Test that the seed URL is added to the krawl queue and that the threadpool is started
@@ -64,13 +84,8 @@ class KrawlerTest {
         val url: List<String> = listOf("http://www.test.com/")
         testKrawler.start(url)
 
-        // Make sure that the URL gets pushed to the crawl queue
-        argumentCaptor<List<QueueEntry>>().apply {
-            verify(mockQueue).push(capture())
-
-            val qe: QueueEntry = allValues[0][0]
-            assertEquals("http://www.test.com/", qe.url)
-        }
+        val qe: QueueEntry = mockQueue.back.first()
+        assertEquals("http://www.test.com/", qe.url)
 
         // Verify submit gets called on the threadpool the number of times specified in the config
         verify(mockThreadpool, times(mockConfig.numThreads)).submit(any())
@@ -96,39 +111,28 @@ class KrawlerTest {
     /**
      * Test the doCrawl method
      */
-    @Test fun testDoCrawl() {
+
+    @Test fun testDoCrawlFullQueue() {
+        // Insert some stuff into the queue
+        mockQueue.push(listOf(QueueEntry("http://www.test.com")))
+
+        // Make the hasBeenSeen return true
+        whenever(mockHistory.hasBeenSeen(any())).thenReturn(false)
+        // Make sure we get a request response
+        whenever(mockRequests.getUrl(any())).thenReturn(preparedResponse)
+
+        // Run doCrawl
         testKrawler.doCrawl()
 
-        // doCrawl should...
-
-        // pop a URL From the queue 1 (initial time) + config.emptyQueueWaitTime (1 / second for the duration)
-        verify(mockQueue, times(1 + mockConfig.emptyQueueWaitTime)).pop()
-        // Since the queue didn't return anything, the crawler is now shutdown
-
-        // Force the queue to return something
-        whenever(mockQueue.pop()).thenReturn(QueueEntry("http://www.test.com/"))
-
-        // Run doCrawl again
-        testKrawler.doCrawl()
-
-        // pop a URL from the queue 1 time
-        verify(mockQueue).pop()
-
-        // Now that it has been popped, ensure that we don't get it again (emulate the delete)
-        // otherwise we'll just keep crawling until we go OOM
-        whenever(mockQueue.pop()).thenReturn(null)
-
-        val kUrl: KrawlUrl = KrawlUrl.Companion.new("http://www.test.com/")
-        // Make the verifyUnique return true
-        whenever(mockHistory.verifyUnique(kUrl)).thenReturn(true)
+        val kUrl: KrawlUrl = KrawlUrl.new("http://www.test.com/")
         // Ensure we've called to verify this is a unique URL
-        verify(mockHistory).verifyUnique(kUrl)
+        verify(mockHistory).hasBeenSeen(any())
         // Now verify that we insert the URL to the history
-        verify(mockHistory).verifyUnique(kUrl)
+        verify(mockHistory).insert(any())
 
         // Should visit will have been called, and since it just returns true
         // we should see the domain count for http://www.test.com/ should be 1
-        assertEquals(1, testKrawler.domainVisitCounts["http://www.test.com/"])
+        assertEquals(1, testKrawler.domainVisitCounts[kUrl.domain])
         // The global visit count should also be 1
         assertEquals(1, testKrawler.globalVisitCount)
 

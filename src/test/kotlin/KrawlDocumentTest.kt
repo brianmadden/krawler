@@ -26,7 +26,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-private fun prepareResponse(expectedResponseCode: Int, responseBody: String): HttpResponse {
+internal fun prepareResponse(expectedResponseCode: Int, responseBody: String): HttpResponse {
     val ret = BasicHttpResponse(
             BasicStatusLine(
                     ProtocolVersion("HTTP", 1, 1),
@@ -42,34 +42,57 @@ private fun prepareResponse(expectedResponseCode: Int, responseBody: String): Ht
 private val mockReturn = prepareResponse(200, "<html><head><title>ABC</title></head>" +
         "<body><a href='http://www.google.com' rel='canonical'>ABC LINK</a></body></html>")
 
+private val mockEmptyReturn = prepareResponse(200, "")
+private val mock404Return = prepareResponse(404, "<html><body>404 Not Found!</body></html>")
+
 
 class CrawlDocumentTest {
 
     val doc: KrawlDocument = KrawlDocument(mockReturn)
+    val emptyDoc: KrawlDocument = KrawlDocument(mockEmptyReturn)
+    val four04Doc: KrawlDocument = KrawlDocument(mock404Return)
 
-    // Doc should have a headers property
+    // All docs should have a headers property
     @Test fun testHeadersProperty() {
         // Headers should be a map
         assertTrue { doc.headers is Map<String, String> }
+        assertTrue { emptyDoc.headers is Map<String, String> }
+        assertTrue { four04Doc.headers is Map<String, String> }
+
         // Headers should be empty
         assertTrue { doc.headers.isEmpty() }
+        assertTrue { emptyDoc.headers.isEmpty() }
+        assertTrue { four04Doc.headers.isEmpty() }
     }
 
     @Test fun testRawHtmlProperty() {
         // it should have a rawHtml element with a title and one anchor tag
         assertEquals("<html><head><title>ABC</title></head>" +
                 "<body><a href='http://www.google.com' rel='canonical'>ABC LINK</a></body></html>", doc.rawHtml)
+
+        // Empty doc should be just the empty string
+        assertEquals("", emptyDoc.rawHtml)
+
+        // 404 doc should be the 404 message as HTML
+        assertEquals("<html><body>404 Not Found!</body></html>", four04Doc.rawHtml)
     }
 
     @Test fun testAnchorTags() {
-        // It should only have one anchor tag
+        // Doc should only have one anchor tag
         assertEquals(1, doc.anchorTags.size)
         // The href property should point to google
         assertEquals("http://www.google.com", doc.anchorTags.first().getAttribute("href"))
+
+        // Empty doc should have no links
+        assertTrue { emptyDoc.anchorTags.isEmpty() }
+        // 404 doc should also have no anchor tags
+        assertTrue { four04Doc.anchorTags.isEmpty() }
     }
 
     // it should have a status code of 200
     @Test fun testStatusCode() {
         assertEquals(200, doc.statusCode)
+        assertEquals(404, four04Doc.statusCode)
+        assertEquals(200, emptyDoc.statusCode)
     }
 }

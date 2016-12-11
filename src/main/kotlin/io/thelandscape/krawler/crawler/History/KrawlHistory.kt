@@ -34,13 +34,13 @@ interface KrawlHistoryIf {
     fun insert(url: KrawlUrl): KrawlHistoryEntry
 
     /**
-     * Verifies that a URL has not previously been visited.
+     * Returns true if a URL has been seen (visited or checked) during this crawl
      *
      * @param url KrawlUrl: The URL to visit
      *
-     * @return true if URL has not been visited previously, false otherwise
+     * @return true if URL HAS been visited previously, false otherwise
      */
-    fun verifyUnique(url: KrawlUrl): Boolean
+    fun hasBeenSeen(url: KrawlUrl): Boolean
 
     /**
      * Clears the Krawl history prior to the timestamp specified by beforeTime.

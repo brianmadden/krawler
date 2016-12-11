@@ -53,4 +53,8 @@ class RequestsTest {
         verify(mockHttpClient, times(2)).execute(any())
     }
 
+    @Test fun testFailedRequest() {
+      TODO()
+    }
+
 }
