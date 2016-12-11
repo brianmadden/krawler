@@ -143,13 +143,17 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         set(value) = continueLock.write { field = value }
 
     // Global visit count and domain visit count
-    private val globalVisitCountLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
+    private val visitCountLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
 
-    var globalVisitCount: Int = 0
-        get() = globalVisitCountLock.read { field }
-        private set(value) = globalVisitCountLock.write { field = value }
+    var visitCount: Int = 0
+        get() = visitCountLock.read { field }
+        private set(value) = visitCountLock.write { field = value }
 
-    val domainVisitCounts: MutableMap<String, Int> = ConcurrentHashMap()
+    private val checkCountLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
+
+    var checkCount: Int = 0
+        get() = checkCountLock.read { field }
+        private set(value) = checkCountLock.write { field = value }
 
     internal fun doCrawl() {
 
@@ -158,7 +162,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         while(continueCrawling) {
 
             // Quit if global threshold met
-            if (globalVisitCount == config.globalTotalPages)
+            if (visitCount == config.totalPages)
                 break
 
             // Pop a URL off the queue
@@ -195,12 +199,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             if (depth >= maxDepth && maxDepth != -1)
                 continue
 
-            // Make sure we're within domain limits
-            val domainCount = domainVisitCounts.getOrElse(krawlUrl.domain, { 0 })
-            val domainTotalPages = config.domainTotalPages
-            if (domainCount >= domainTotalPages && domainTotalPages != -1)
-                continue
-
             val history: KrawlHistoryEntry =
                     if (krawlHistory.hasBeenSeen(krawlUrl)) { // If it has been seen
                         onRepeatVisit(krawlUrl, parent)
@@ -211,10 +209,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             // If we're supposed to visit this, get the HTML and call visit
             if (shouldVisit(krawlUrl)) {
-
-                // Increment the domain visit count
-                domainVisitCounts[krawlUrl.domain] = domainCount + 1
-                globalVisitCount += 1
+                visitCount += 1
 
                 val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
 
@@ -239,9 +234,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             // If we're supposed to check this, get the status code and call check
             if (shouldCheck(krawlUrl)) {
+                // Increment the check count
+                checkCount += 1
 
-                // Increment the domain visit count
-                domainVisitCounts[krawlUrl.domain] = domainCount + 1
                 val doc: RequestResponse = requestProvider.checkUrl(krawlUrl)
 
                 if (doc is ErrorResponse || doc !is KrawlDocument) {

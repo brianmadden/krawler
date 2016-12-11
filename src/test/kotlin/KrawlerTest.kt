@@ -130,11 +130,8 @@ class KrawlerTest {
         // Now verify that we insert the URL to the history
         verify(mockHistory).insert(any())
 
-        // Should visit will have been called, and since it just returns true
-        // we should see the domain count for http://www.test.com/ should be 1
-        assertEquals(1, testKrawler.domainVisitCounts[kUrl.domain])
         // The global visit count should also be 1
-        assertEquals(1, testKrawler.globalVisitCount)
+        assertEquals(1, testKrawler.visitCount)
 
     }
 

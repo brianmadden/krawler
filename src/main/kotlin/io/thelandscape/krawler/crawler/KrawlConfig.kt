@@ -27,10 +27,7 @@ class KrawlConfig(
         val maxDepth: Int = -1,
         // Global crawl limit -- if this is reached, shutdown
         // Default: -1 (unlimited)
-        val globalTotalPages: Int = -1,
-        // Domain crawl limit -- if this is reached, reject further URLs from this domain
-        // Default: -1 (unlimited)
-        val domainTotalPages: Int = -1,
+        val totalPages: Int = -1,
         // Politeness delay (in ms) to wait between requests
         // Default: 200ms
         val politenessDelay: Int = 200,
