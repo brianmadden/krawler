@@ -30,7 +30,7 @@ class KrawlConfig(
         val totalPages: Int = -1,
         // Politeness delay (in ms) to wait between requests
         // Default: 200ms
-        val politenessDelay: Int = 200,
+        val politenessDelay: Long = 200,
         // Should binary content be visited?
         // Default: false
         val visitBinaryContent: Boolean = false,

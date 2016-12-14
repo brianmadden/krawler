@@ -1,13 +1,15 @@
 package io.thelandscape.krawler.crawler.KrawlQueue
 
 import com.github.andrewoma.kwery.core.Session
-import com.github.andrewoma.kwery.fetcher.*
+import com.github.andrewoma.kwery.fetcher.GraphFetcher
+import com.github.andrewoma.kwery.fetcher.Node
+import com.github.andrewoma.kwery.fetcher.Property
+import com.github.andrewoma.kwery.fetcher.Type
 import com.github.andrewoma.kwery.mapper.*
-import com.github.andrewoma.kwery.mapper.Value
 import com.github.andrewoma.kwery.mapper.util.camelToLowerUnderscore
+import io.thelandscape.krawler.crawler.History.KrawlHistory
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.History.KrawlHistoryHSQLDao
-import io.thelandscape.krawler.crawler.History.KrawlHistory
 import io.thelandscape.krawler.hsqlSession
 
 /**
@@ -49,15 +51,9 @@ object krawlQueueTable : Table<QueueEntry, String>("krawlQueue",
 
 internal val KrawlQueueDao = KrawlQueueHSQLDao(hsqlSession)
 
-class KrawlQueueHSQLDao(session: Session):
+class KrawlQueueHSQLDao(session: Session,
+                        private val histDao: KrawlHistoryHSQLDao = KrawlHistory):
         KrawlQueueIf, AbstractDao<QueueEntry, String>(session, krawlQueueTable, QueueEntry::url) {
-
-    private var histDao: KrawlHistoryHSQLDao = KrawlHistory
-        private set(value) { field = value }
-
-    constructor(session: Session, histDao: KrawlHistoryHSQLDao): this(session) {
-        this.histDao = histDao
-    }
 
     init {
         // Create queue table

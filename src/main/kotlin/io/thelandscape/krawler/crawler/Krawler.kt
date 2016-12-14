@@ -24,11 +24,13 @@ import io.thelandscape.krawler.crawler.History.KrawlHistory
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueDao
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
 import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
+import io.thelandscape.krawler.crawler.util.withPoliteLock
 import io.thelandscape.krawler.http.*
 import java.time.LocalDateTime
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.locks.ReentrantLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
@@ -155,6 +157,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         get() = checkCountLock.read { field }
         private set(value) = checkCountLock.write { field = value }
 
+    // Lock to enforce politeness
+    val politeLock: ReentrantLock = ReentrantLock()
+    private fun KrawlQueueIf.politePop(): QueueEntry? =
+            politeLock.withPoliteLock(config.politenessDelay) { queue.pop() }
+
     internal fun doCrawl() {
 
         var emptyQueueWaitCount: Int = 0
@@ -166,7 +173,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 break
 
             // Pop a URL off the queue
-            var qe: QueueEntry? = queue.pop()
+            var qe: QueueEntry? = queue.politePop()
             if (qe == null) {
 
                 // Wait for the configured period for more URLs
