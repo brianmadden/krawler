@@ -17,13 +17,16 @@
  */
 
 import io.thelandscape.krawler.http.KrawlDocument
+import io.thelandscape.krawler.http.KrawlUrl
 import org.apache.http.HttpResponse
 import org.apache.http.ProtocolVersion
 import org.apache.http.entity.StringEntity
 import org.apache.http.message.BasicHttpResponse
 import org.apache.http.message.BasicStatusLine
 import org.junit.Test
+import org.w3c.dom.NodeList
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 internal fun prepareResponse(expectedResponseCode: Int, responseBody: String): HttpResponse {
@@ -45,11 +48,12 @@ private val mockReturn = prepareResponse(200, "<html><head><title>ABC</title></h
 private val mockEmptyReturn = prepareResponse(200, "")
 private val mock404Return = prepareResponse(404, "<html><body>404 Not Found!</body></html>")
 
+private val parent: KrawlUrl = KrawlUrl.new("http://www.parent.com/")
 
 class CrawlDocumentTest {
 
     val doc: KrawlDocument = KrawlDocument(mockReturn)
-    val emptyDoc: KrawlDocument = KrawlDocument(mockEmptyReturn)
+    val emptyDoc: KrawlDocument = KrawlDocument(mockEmptyReturn, parent)
     val four04Doc: KrawlDocument = KrawlDocument(mock404Return)
 
     // All docs should have a headers property
@@ -94,5 +98,15 @@ class CrawlDocumentTest {
         assertEquals(200, doc.statusCode)
         assertEquals(404, four04Doc.statusCode)
         assertEquals(200, emptyDoc.statusCode)
+    }
+
+    @Test fun testParent() {
+        assertNull(doc.parent)
+        assertNull(four04Doc.parent)
+        assertEquals(parent, emptyDoc.parent)
+    }
+
+    @Test fun testNodeListToElementList() {
+        TODO()
     }
 }

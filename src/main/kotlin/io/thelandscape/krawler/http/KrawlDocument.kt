@@ -78,7 +78,7 @@ class KrawlDocument(private val response: HttpResponse) : RequestResponse {
         }
 
     /// Utility method to convert a NodeList to a List<Element>
-    private fun NodeList.toElementList(): List<Element> {
+    internal fun NodeList.toElementList(): List<Element> {
         if (this.length == 0) return listOf()
 
         return (0..this.length - 1)

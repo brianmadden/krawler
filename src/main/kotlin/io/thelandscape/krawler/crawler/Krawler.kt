@@ -159,6 +159,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
     // Lock to enforce politeness
     val politeLock: ReentrantLock = ReentrantLock()
+    // Extension function to make pop polite
     private fun KrawlQueueIf.politePop(): QueueEntry? =
             politeLock.withPoliteLock(config.politenessDelay) { queue.pop() }
 

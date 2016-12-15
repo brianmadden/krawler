@@ -25,7 +25,6 @@ import io.thelandscape.krawler.crawler.Krawler
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestProviderIf
-import org.apache.http.HttpResponse
 import org.junit.Before
 import org.junit.Test
 import java.util.concurrent.ExecutorService
@@ -112,7 +111,7 @@ class KrawlerTest {
      * Test the doCrawl method
      */
 
-    @Test fun testDoCrawlFullQueue() {
+    @Test fun testDoCrawl() {
         // Insert some stuff into the queue
         mockQueue.push(listOf(QueueEntry("http://www.test.com")))
 
@@ -124,7 +123,6 @@ class KrawlerTest {
         // Run doCrawl
         testKrawler.doCrawl()
 
-        val kUrl: KrawlUrl = KrawlUrl.new("http://www.test.com/")
         // Ensure we've called to verify this is a unique URL
         verify(mockHistory).hasBeenSeen(any())
         // Now verify that we insert the URL to the history
