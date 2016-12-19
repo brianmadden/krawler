@@ -130,7 +130,6 @@ class KrawlerTest {
 
         // The global visit count should also be 1
         assertEquals(1, testKrawler.visitCount)
-
     }
 
 }

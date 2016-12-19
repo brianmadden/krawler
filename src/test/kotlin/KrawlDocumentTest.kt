@@ -105,8 +105,4 @@ class CrawlDocumentTest {
         assertNull(four04Doc.parent)
         assertEquals(parent, emptyDoc.parent)
     }
-
-    @Test fun testNodeListToElementList() {
-        TODO()
-    }
 }

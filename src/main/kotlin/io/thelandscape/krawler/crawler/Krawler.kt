@@ -27,12 +27,11 @@ import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
 import io.thelandscape.krawler.crawler.util.withPoliteLock
 import io.thelandscape.krawler.http.*
 import java.time.LocalDateTime
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import java.util.concurrent.*
 import java.util.concurrent.locks.ReentrantLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
+import kotlin.concurrent.thread
 import kotlin.concurrent.write
 
 /**
@@ -117,7 +116,21 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         return
     }
 
-    fun startNonblocking(): Unit = TODO()
+    /**
+     * Function is called at the start of a crawl, prior to any worker threads taking any action.
+     * This should be overridden to take an action prior to any worker threads running.
+     */
+    open protected fun onCrawlStart() {
+        return
+    }
+
+    /**
+     * Function is called at the end of a crawl, after all worker threads have exit.
+     * This should be overridden to take an action after all worker threads have exit.
+     */
+    open protected fun onCrawlEnd() {
+        return
+    }
 
     fun start(seedUrl: String) = start(listOf(seedUrl))
 
@@ -128,7 +141,45 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         // Insert the seeds
         queue.push(krawlUrls.map{ QueueEntry(it.canonicalForm) })
 
-        (1..config.numThreads).forEach { threadpool.submit { doCrawl() } }
+        onCrawlStart()
+        val threads: List<Future<*>> = (1..config.numThreads).map { threadpool.submit { doCrawl() } }
+        threads.forEach {
+            try {
+                it.get()
+            }
+            catch (e: InterruptedException) {}
+            catch(e: ExecutionException) {}
+            catch(e: CancellationException) {}
+        }
+        onCrawlEnd()
+    }
+
+    fun startNonblocking(seedUrl: String) = startNonblocking(listOf(seedUrl))
+
+    fun startNonblocking(seedUrl: List<String>) {
+        // Convert all URLs to KrawlUrls
+        val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
+
+        // Insert the seeds
+        queue.push(krawlUrls.map{ QueueEntry(it.canonicalForm) })
+
+        // Nonblocking so do all the work in another thread
+        thread {
+            onCrawlStart()
+
+            val threads: List<Future<*>> = (1..config.numThreads).map { threadpool.submit { doCrawl() } }
+            threads.forEach {
+                try {
+                    it.get()
+                }
+                catch (e: InterruptedException) {}
+                catch(e: ExecutionException) {}
+                catch(e: CancellationException) {}
+            }
+
+            onCrawlEnd()
+        }
+
     }
 
     fun stop() = threadpool.shutdown()
