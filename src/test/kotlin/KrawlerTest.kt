@@ -81,7 +81,7 @@ class KrawlerTest {
      */
     @Test fun testStarts() {
         val url: List<String> = listOf("http://www.test.com/")
-        testKrawler.start(url)
+        testKrawler.startNonblocking(url)
 
         val qe: QueueEntry = mockQueue.back.first()
         assertEquals("http://www.test.com/", qe.url)

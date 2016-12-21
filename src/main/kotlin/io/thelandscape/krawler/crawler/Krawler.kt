@@ -168,6 +168,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             onCrawlStart()
 
             val threads: List<Future<*>> = (1..config.numThreads).map { threadpool.submit { doCrawl() } }
+            println("LIS IS ${threads.size}")
             threads.forEach {
                 try {
                     it.get()
