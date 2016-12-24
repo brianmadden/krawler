@@ -83,8 +83,9 @@ class KrawlQueueHSQLDao(session: Session,
         var out: List<QueueEntry> = listOf()
         session.transaction {
             out = session.select(selectSql, params, mapper = table.rowMapper())
-            session.update("DELETE FROM ${table.name} WHERE url IN (:ids)",
-                    mapOf("ids" to out.map{ it.url }.joinToString(",")))
+            if (out.isNotEmpty())
+                session.update("DELETE FROM ${table.name} WHERE url IN (:ids)",
+                        mapOf("ids" to out.map{ it.url }.joinToString(",")))
         }
 
         return out

@@ -28,6 +28,8 @@ import io.thelandscape.krawler.http.RequestProviderIf
 import org.junit.Before
 import org.junit.Test
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.ThreadFactory
 import kotlin.test.assertEquals
 
 class MockQueue() : KrawlQueueIf {
@@ -50,7 +52,8 @@ class KrawlerTest {
     val mockQueue = MockQueue()
     val mockHistory = mock<KrawlHistoryIf>()
     val mockRequests = mock<RequestProviderIf>()
-    val mockThreadpool = mock<ExecutorService>()
+    val mockThreadfactory = mock<ThreadFactory>()
+    val mockThreadpool = Executors.newCachedThreadPool(mockThreadfactory)
 
     val preparedResponse = KrawlDocument(prepareResponse(200, ""))
 
@@ -74,12 +77,14 @@ class KrawlerTest {
 
     val testKrawler = testCrawler(mockConfig, mockQueue, mockHistory, mockRequests, mockThreadpool)
 
-    @Before fun setUp() = MockitoKotlin.registerInstanceCreator { KrawlUrl.new("") }
+    @Before fun setUp() {
+        MockitoKotlin.registerInstanceCreator { KrawlUrl.new("") }
+    }
 
     /**
      * Test that the seed URL is added to the krawl queue and that the threadpool is started
      */
-    @Test fun testStarts() {
+    @Test fun testStartBlocking() {
         val url: List<String> = listOf("http://www.test.com/")
         testKrawler.startNonblocking(url)
 
@@ -87,8 +92,7 @@ class KrawlerTest {
         assertEquals("http://www.test.com/", qe.url)
 
         // Verify submit gets called on the threadpool the number of times specified in the config
-        verify(mockThreadpool, times(mockConfig.numThreads)).submit(any())
-
+        verify(mockThreadfactory, times(mockConfig.numThreads)).newThread(any())
     }
 
     /**

@@ -1,2 +1,3 @@
-rootProject.name = 'krawler'
+rootProject.name = "krawler"
 
+include "example"

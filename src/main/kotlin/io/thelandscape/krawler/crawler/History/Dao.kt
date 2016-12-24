@@ -67,7 +67,7 @@ class KrawlHistoryHSQLDao(session: Session):
     override fun hasBeenSeen(url: KrawlUrl): Boolean {
         val params = mapOf("url" to url.canonicalForm)
         val res = session.select("SELECT COUNT(*) FROM ${table.name} WHERE url = :url",
-                params, mapper = { it.resultSet.getLong(0) })
+                params, mapper = { it.resultSet.getLong(1) })
 
 
         return res.first() == 0L
