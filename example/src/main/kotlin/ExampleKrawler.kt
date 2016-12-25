@@ -24,7 +24,7 @@ import io.thelandscape.krawler.http.KrawlUrl
 class ExampleKrawler(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
     override fun shouldVisit(url: KrawlUrl): Boolean {
-        println("Should visit ${url.canonicalForm}?")
+        System.err.println("Should visit ${url.canonicalForm}?")
         if (url.domain == "wikipedia.org")
             return true
 

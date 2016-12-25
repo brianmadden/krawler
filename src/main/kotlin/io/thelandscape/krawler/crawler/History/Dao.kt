@@ -1,11 +1,3 @@
-package io.thelandscape.krawler.crawler.History
-
-import com.github.andrewoma.kwery.core.Session
-import com.github.andrewoma.kwery.mapper.*
-import com.github.andrewoma.kwery.mapper.util.camelToLowerUnderscore
-import io.thelandscape.krawler.http.KrawlUrl
-import java.time.LocalDateTime
-
 /**
  * Created by brian.a.madden@gmail.com on 11/24/16.
  *
@@ -23,6 +15,16 @@ import java.time.LocalDateTime
  * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+
+package io.thelandscape.krawler.crawler.History
+
+import com.github.andrewoma.kwery.core.Session
+import com.github.andrewoma.kwery.mapper.*
+import com.github.andrewoma.kwery.mapper.util.camelToLowerUnderscore
+import io.thelandscape.krawler.http.KrawlUrl
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.ZoneOffset
 
 object krawlHistoryTable : Table<KrawlHistoryEntry, Long>("KrawlHistory",
         TableConfiguration(standardDefaults + timeDefaults,
@@ -58,8 +60,9 @@ class KrawlHistoryHSQLDao(session: Session):
     }
 
     override fun clearHistory(beforeTime: LocalDateTime): Int {
-        val params = mapOf("timestamp" to beforeTime)
-        val res = session.update("DELETE FROM ${table.name} WHERE timestamp = :timestamp", params)
+        val convertedTs: String = beforeTime.toString().replace("T", " ")
+        val params = mapOf("timestamp" to convertedTs)
+        val res = session.update("DELETE FROM ${table.name} WHERE timestamp < :timestamp", params)
 
         return res
     }
@@ -69,7 +72,6 @@ class KrawlHistoryHSQLDao(session: Session):
         val res = session.select("SELECT COUNT(*) FROM ${table.name} WHERE url = :url",
                 params, mapper = { it.resultSet.getLong(1) })
 
-
-        return res.first() == 0L
+        return res.first() != 0L
     }
 }

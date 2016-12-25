@@ -142,10 +142,10 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         queue.push(krawlUrls.map{ QueueEntry(it.canonicalForm) })
 
         onCrawlStart()
-        val threads: List<Future<*>> = (1..config.numThreads).map { threadpool.submit { doCrawl() } }
+        val threads: List<Thread> = (1..config.numThreads).map { thread { doCrawl() } }
         threads.forEach {
             try {
-                it.get()
+                it.join()
             }
             catch (e: InterruptedException) {}
             catch(e: ExecutionException) {}
@@ -169,12 +169,15 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             val threads: List<Future<*>> = (1..config.numThreads).map { threadpool.submit{ doCrawl() } }
             threads.forEach {
+                /*
                 try {
                     it.get()
                 }
                 catch (e: InterruptedException) {}
-                catch(e: ExecutionException) {}
+                catch(e: ExecutidonException) {}
                 catch(e: CancellationException) {}
+                */
+                it.get()
             }
 
             onCrawlEnd()
@@ -215,7 +218,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             politeLock.withPoliteLock(config.politenessDelay) { queue.pop() }
 
     internal fun doCrawl() {
-
+        println("HIT HERE")
         var emptyQueueWaitCount: Int = 0
 
         while(continueCrawling) {
