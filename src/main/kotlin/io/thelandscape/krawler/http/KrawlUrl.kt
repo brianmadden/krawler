@@ -48,12 +48,15 @@ class KrawlUrl private constructor(private var url: String, parent: String) {
         }
     }
 
-    // Make relative URLs absolute if we've got a parent URL
+    // Sanitize incoming URLs as necessary
     init {
+        // Trim excess whitespace
+        url = url.trim()
+        // Make relative URLs absolute if we've got a parent URL
         val u: URI = URI(url)
         if (!u.isAbsolute) {
             val parentUri = URI(parent)
-            url = parentUri.host + url
+            url = parentUri.scheme + "://" + parentUri.host + url
         }
     }
 
@@ -72,7 +75,7 @@ class KrawlUrl private constructor(private var url: String, parent: String) {
 
         wasExtractedFromAnchor = true
         // Anchor text is actually contained within the first child node
-        anchorText = anchor.textContent ?: ""
+         anchorText = anchor.textContent ?: ""
         // Attributes are a map of Nodes where each Node is an Attribute
         // (https://docs.oracle.com/javase/8/docs/api/org/w3c/dom/Node.html)
         anchorAttributes = (0..anchor.attributes.length - 1).associate {

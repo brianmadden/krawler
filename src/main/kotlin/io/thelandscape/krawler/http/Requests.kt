@@ -24,6 +24,7 @@ import org.apache.http.client.methods.HttpHead
 import org.apache.http.client.methods.HttpUriRequest
 import org.apache.http.impl.client.CloseableHttpClient
 import org.apache.http.impl.client.HttpClients
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 
 interface RequestProviderIf {
     /**
@@ -38,8 +39,12 @@ interface RequestProviderIf {
 }
 
 val Request: Requests = Requests()
+private val pcm: PoolingHttpClientConnectionManager = PoolingHttpClientConnectionManager()
 
-class Requests(val httpClient: CloseableHttpClient = HttpClients.createDefault()) : RequestProviderIf {
+// TODO: Clean up the connection pool somewhere
+
+class Requests(val httpClient: CloseableHttpClient =
+               HttpClients.custom().setConnectionManager(pcm).build()) : RequestProviderIf {
 
     /** Check a URL and return it's status code
      * @param url KrawlUrl: the url to check
@@ -72,9 +77,8 @@ class Requests(val httpClient: CloseableHttpClient = HttpClients.createDefault()
             if (response == null) ErrorResponse() else retFun(response)
         } catch (e: Exception) {
             throw ContentFetchError(url, e)
-        } finally {
-            httpClient.close()
         }
+
         return resp
     }
 }

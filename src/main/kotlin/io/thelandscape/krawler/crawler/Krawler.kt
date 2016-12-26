@@ -289,7 +289,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 // Parse out the URLs and construct queue entries from them
                 val links: List<QueueEntry> = doc.anchorTags
                         .filterNot { it.getAttribute("href").startsWith("#") }
-                        .map { KrawlUrl.new(it, krawlUrl.host) }
+                        .map { KrawlUrl.new(it, krawlUrl.rawUrl) }
                         .filterNotNull()
                         .filter { it.canonicalForm.isNotBlank() }
                         .map { QueueEntry(it.canonicalForm, history, depth + 1) }
