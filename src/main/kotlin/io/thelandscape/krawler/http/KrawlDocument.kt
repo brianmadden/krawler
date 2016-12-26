@@ -63,7 +63,7 @@ class KrawlDocument(private val response: HttpResponse) : RequestResponse {
         get() = response.statusLine.statusCode
 
     /**
-     * Anchor tags pulled out
+     * Anchor tags that have the href attribute
      */
     val anchorTags: List<Element>
         get() {
@@ -74,7 +74,7 @@ class KrawlDocument(private val response: HttpResponse) : RequestResponse {
                 return listOf()
             }
 
-            return parsed.getElementsByTagName("a").toElementList()
+            return parsed.getElementsByTagName("a").toElementList().filter { it.hasAttribute("href") }
         }
 
     /// Utility method to convert a NodeList to a List<Element>

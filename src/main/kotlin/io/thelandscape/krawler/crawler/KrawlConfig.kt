@@ -38,6 +38,8 @@ class KrawlConfig(
         val userAgent: String = "io.thelandscape.Krawler Web Crawler",
         // Directory where KrawlQueue will be persisted
         val crawlDirectory: String = ".krawl",
+        // Should the Krawl progress persist?
+        val persistentKrawl: Boolean = false,
         // Length of time to sleep when queue becomes empty
         emptyQueueWaitTime: Int = 10
 ) {

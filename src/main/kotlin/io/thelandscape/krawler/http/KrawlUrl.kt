@@ -30,19 +30,30 @@ import org.w3c.dom.Node
  * the anchor text, rel property, and any other pertinent data, otherwise these fields
  * will be blank.
  *
+ * TODO: Fix cases where relative URL results in domain info being lost
+ *
  */
 
-class KrawlUrl private constructor(url: String) {
+class KrawlUrl private constructor(private var url: String, parent: String) {
 
     companion object {
-        fun new(url: String): KrawlUrl {
-            return KrawlUrl(url)
+        fun new(url: String, parent: String = ""): KrawlUrl {
+            return KrawlUrl(url, parent)
         }
 
-        fun new(anchor: Element): KrawlUrl? {
+        fun new(anchor: Element, parent: String = ""): KrawlUrl? {
             if (anchor.tagName != "a" && !anchor.hasAttribute("href"))
                 return null
-            return KrawlUrl(anchor)
+            return KrawlUrl(anchor, parent)
+        }
+    }
+
+    // Make relative URLs absolute if we've got a parent URL
+    init {
+        val u: URI = URI(url)
+        if (!u.isAbsolute) {
+            val parentUri = URI(parent)
+            url = parentUri.host + url
         }
     }
 
@@ -57,11 +68,11 @@ class KrawlUrl private constructor(url: String) {
         private set
 
     // Constructor used when we pass a full anchor tag in
-    private constructor(anchor: Element): this(anchor.getAttribute("href")) {
+    private constructor(anchor: Element, parent: String): this(anchor.getAttribute("href"), parent) {
 
         wasExtractedFromAnchor = true
         // Anchor text is actually contained within the first child node
-        anchorText = anchor.firstChild.nodeValue
+        anchorText = anchor.textContent ?: ""
         // Attributes are a map of Nodes where each Node is an Attribute
         // (https://docs.oracle.com/javase/8/docs/api/org/w3c/dom/Node.html)
         anchorAttributes = (0..anchor.attributes.length - 1).associate {
@@ -99,15 +110,15 @@ class KrawlUrl private constructor(url: String) {
         get() = idn?.publicSuffix().toString()
 
     val domain: String
-        get() = uri.host
+        get() = (uri.host ?: "")
                 .replace("." + suffix, "")
                 .split(".")
                 .last() + "." + suffix
 
     val subdomain: String
-        get() = uri.host
-                .replace("." + suffix, "")
-                .replace("." + domain, "")
+        get() = (uri.host ?: "").replace("." + domain, "")
+
+    val host: String = uri.host ?: ""
 
     val path: String = uri.path ?: ""
 

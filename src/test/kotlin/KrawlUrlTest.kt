@@ -82,6 +82,8 @@ class KrawlUrlTest {
 
     @Test fun testPath() = assertEquals("/./zyxzzy", testUrl.path)
 
+    @Test fun testHost() = assertEquals("www.xyz.abc.com", testUrl.host)
+
     @Test fun testExtractedFromAnchor() {
         // The test URL was from a string
         assertFalse(testUrl.wasExtractedFromAnchor)

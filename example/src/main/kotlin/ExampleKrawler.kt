@@ -41,4 +41,8 @@ class ExampleKrawler(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
         return
     }
 
+    override fun onCrawlEnd() {
+        println("Crawled $visitCount pages.")
+    }
+
 }

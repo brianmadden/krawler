@@ -132,6 +132,12 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         return
     }
 
+    /**
+     * Arbitrary data structure associated with this crawl to provide context or a shared
+     * resource.
+     */
+    open protected var crawlContext: Any? = null
+
     fun start(seedUrl: String) = start(listOf(seedUrl))
 
     fun start(seedUrl: List<String>) {
@@ -212,13 +218,12 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         private set(value) = checkCountLock.write { field = value }
 
     // Lock to enforce politeness
-    val politeLock: ReentrantLock = ReentrantLock()
+    private val politeLock: ReentrantLock = ReentrantLock()
     // Extension function to make pop polite
     private fun KrawlQueueIf.politePop(): QueueEntry? =
             politeLock.withPoliteLock(config.politenessDelay) { queue.pop() }
 
     internal fun doCrawl() {
-        println("HIT HERE")
         var emptyQueueWaitCount: Int = 0
 
         while(continueCrawling) {
@@ -283,12 +288,15 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
                 // Parse out the URLs and construct queue entries from them
                 val links: List<QueueEntry> = doc.anchorTags
-                            .map { KrawlUrl.new(it.getAttribute("href")) }
-                            .filterNotNull()
-                            .map { QueueEntry(it.canonicalForm, history, depth + 1) }
+                        .filterNot { it.getAttribute("href").startsWith("#") }
+                        .map { KrawlUrl.new(it, krawlUrl.host) }
+                        .filterNotNull()
+                        .filter { it.canonicalForm.isNotBlank() }
+                        .map { QueueEntry(it.canonicalForm, history, depth + 1) }
 
                 // Insert the URLs to the queue now
-                queue.push(links)
+                if (links.isNotEmpty())
+                    queue.push(links)
 
                 // Finally call visit
                 visit(krawlUrl, doc)
