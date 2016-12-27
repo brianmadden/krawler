@@ -34,7 +34,7 @@ object historyConverter :
         SimpleConverter<KrawlHistoryEntry>( { row, c -> KrawlHistoryEntry(row.long(c)) }, KrawlHistoryEntry::id)
 
 object krawlQueueTable : Table<QueueEntry, String>("krawlQueue",
-        TableConfiguration(standardDefaults + timeDefaults + reifiedValue(KrawlHistoryEntry(-1)),
+        TableConfiguration(standardDefaults + timeDefaults + reifiedValue(KrawlHistoryEntry()),
                 standardConverters + timeConverters + reifiedConverter(historyConverter), camelToLowerUnderscore)) {
 
     val Url by col(QueueEntry::url, id = true)
