@@ -39,21 +39,6 @@ class KrawlUrlTest {
 
     @Test fun testRawURL() = assertEquals(rawUrl, testUrl.rawUrl)
 
-    @Test fun testIsHttp() {
-        // Verify that an absolute URL with http & https isHttp returns true
-        val absoluteHttp = KrawlUrl.new("http://www.abc.com")
-        val absoluteHttps = KrawlUrl.new("https://www.abc.com")
-        assertTrue { absoluteHttp.isHttp && absoluteHttps.isHttp }
-
-        // Verify that absolute URLs with a scheme other than http isHttp returns false
-        val absoluteNonHttp = KrawlUrl.new("file://abc/def")
-        assertFalse { absoluteNonHttp.isHttp }
-
-        // Verify that an opaque URI isHttp returns false
-        val opaqueUri = KrawlUrl.new("mailto:abc@abc.com")
-        assertFalse { opaqueUri.isHttp }
-    }
-
     @Test fun testCanonicalForm() {
         // it should have a canonical form that is normalized
         assertEquals("http://www.xyz.abc.com/zyxzzy", testUrl.canonicalForm)
