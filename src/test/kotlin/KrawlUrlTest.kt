@@ -41,7 +41,7 @@ class KrawlUrlTest {
 
     @Test fun testCanonicalForm() {
         // it should have a canonical form that is normalized
-        assertEquals("http://www.xyz.abc.com/zyxzzy%3A", testUrl.canonicalForm)
+        assertEquals("http://www.xyz.abc.com/~zyxzzy/abc%3A", testUrl.canonicalForm)
 
         // It should have a canonical form that adds a slash if the URL ends with the domain suffix
         val testAddSlash = KrawlUrl.new("http://www.xyz.com")
@@ -74,7 +74,7 @@ class KrawlUrlTest {
 
     @Test fun testSubdomain() = assertEquals("www.xyz", testUrl.subdomain)
 
-    @Test fun testPath() = assertEquals("/./zyxzzy", testUrl.path)
+    @Test fun testPath() = assertEquals("/../%7Ezyxzzy/./abc%3a", testUrl.path)
 
     @Test fun testHost() = assertEquals("www.xyz.abc.com", testUrl.host)
 

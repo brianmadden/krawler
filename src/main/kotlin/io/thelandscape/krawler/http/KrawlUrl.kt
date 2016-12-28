@@ -94,7 +94,9 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
     val port: Int = host.split(":").getOrElse(1, { if (scheme == "http") "80" else "443" }).toInt()
 
     // The path is the part after the host (starting with the first / after the host)
-    val path: String = if(isAbsolute) url.replace(scheme + "://" + host, "") else url
+    val path: String = if(isAbsolute)
+        url.replace(scheme + "://" + host, "", true).dropWhile { it != '/' }
+    else url
 
     // The normal form doesn't contain any /./ or /../
     val normalForm: String = normalize(scheme, host, path)
@@ -152,11 +154,9 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
                 .joinToString("%")
     }
 
-    val canonicalForm: String = normalForm
-
     private val idn: InternetDomainName? = try {
         InternetDomainName.from(this.host)
-    } catch (e: NullPointerException) {
+    } catch (e: Throwable) {
         null
     }
 
@@ -166,6 +166,11 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
     val domain: String = host.replace("." + suffix, "").split(".").last() + "." + suffix
 
     val subdomain: String = host.replace("." + domain, "")
+
+    // Create a canonical form that we can use to better determine if a URL has been seen before
+    // TODO: Remove ? if no query parameters follow
+    // TODO: Remove duplicate / other than after scheme portion
+    val canonicalForm: String = if (normalForm.endsWith(suffix)) normalForm + "/" else normalForm
 
     override fun toString(): String = canonicalForm
 
