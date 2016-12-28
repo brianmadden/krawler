@@ -33,7 +33,7 @@ class KrawlUrlTest {
     private val db = dbf.newDocumentBuilder()
     private val doc: Element = db.parse(ByteArrayInputStream(anchorNode.toByteArray())).documentElement
 
-    val rawUrl = "http://www.xyz.abc.com/./zyxzzy"
+    val rawUrl = "HTTP://www.xyz.ABC.com:80/../%7Ezyxzzy/./abc%3a"
     val testUrl = KrawlUrl.new(rawUrl)
     val anchorTestUrl = KrawlUrl.new(doc)
 
@@ -41,7 +41,7 @@ class KrawlUrlTest {
 
     @Test fun testCanonicalForm() {
         // it should have a canonical form that is normalized
-        assertEquals("http://www.xyz.abc.com/zyxzzy", testUrl.canonicalForm)
+        assertEquals("http://www.xyz.abc.com/zyxzzy%3A", testUrl.canonicalForm)
 
         // It should have a canonical form that adds a slash if the URL ends with the domain suffix
         val testAddSlash = KrawlUrl.new("http://www.xyz.com")
@@ -57,7 +57,16 @@ class KrawlUrlTest {
     }
 
     // it should have no /./ in normalized form
-    @Test fun testNormalForm() = assertFalse(testUrl.normalForm.contains("///.//"))
+    @Test fun testNormalForm() {
+        // General equality test
+        assertEquals("http://www.xyz.abc.com/~zyxzzy/abc%3A", testUrl.normalForm)
+        // Ensure lower case scheme and host
+        assertEquals(testUrl.scheme.toLowerCase(), testUrl.scheme)
+        assertEquals(testUrl.host.toLowerCase(), testUrl.host)
+        // Ensure capitalized encoded octets
+        // Make sure we've removed the /../
+        assertFalse(testUrl.normalForm.contains("///..//"))
+    }
 
     @Test fun testSuffix() = assertEquals("com", testUrl.suffix)
 

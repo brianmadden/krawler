@@ -78,44 +78,81 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
     val isAbsolute: Boolean = url.split(":").getOrElse(1, {""}).startsWith("/")
 
     // For our purposes all URLs are http(s) so if it isn't absolute assume http
-    val scheme: String = if(isAbsolute) url.split("://").first() else "http"
-
-    // The sanitized URL is trimmed and converted to absolute if it's relative w/ a parent
-    val sanitizedUrl: String = if (isAbsolute) url.trim() else "${parent?.scheme}://${parent?.host}/${url.trim()}"
+    // CASE INSENSITIVE -- convert to lowercase for normalization
+    val scheme: String = if(isAbsolute) url.split("://").first().toLowerCase() else parent?.scheme ?: "http"
 
     // Host is the part between the :// and the first /
-    val host: String = sanitizedUrl.split("://").getOrElse(1, {""}).split("/").first()
+    // NORMALIZATION: convert to lowercase for normalization
+    val host: String = if(isAbsolute) url.split("://")
+            .getOrElse(1, { "" })
+            .split("/")
+            .first()
+            .toLowerCase()
+            .replace(Regex(":[0-9]+"), "") else parent?.host ?: ""
+
+    // Get the port information
+    val port: Int = host.split(":").getOrElse(1, { if (scheme == "http") "80" else "443" }).toInt()
 
     // The path is the part after the host (starting with the first / after the host)
-    val path: String = sanitizedUrl.split("://").getOrElse(1, {""}).removePrefix(host)
+    val path: String = if(isAbsolute) url.replace(scheme + "://" + host, "") else url
 
     // The normal form doesn't contain any /./ or /../
-    val normalForm: String
-        get() {
-            // Make the scheme and host lowercase
-            val lower = scheme.toLowerCase() + "://" + host.toLowerCase() + "/" + path
-            // Remove default ports
-            val port_removed = if (scheme == "http") lower.replace(":80", "") else
-                if (scheme == "https") lower.replace(":443", "")
-                else lower
+    val normalForm: String = normalize(scheme, host, path)
 
-            // Capitalize letters in % encoded triplets
-            val capitalizedTriplets: String = port_removed
-                    .split("%")
-                    .mapIndexed { i, s -> if (i == 0) s else
-                        s.mapIndexed { i, c -> if (i < 2) c.toUpperCase() else c }.joinToString("") }
-                    .joinToString("%")
+    // Do the work to normalize the URL we're working with
+    // TODO: Make this public and part of a companion object?
+    internal fun normalize(scheme: String, host: String, path: String): String {
+        val initial: String = scheme + "://" + host + path
 
-            // Decode % encoded triplets of unreserved characters
-            val decodedTriplets: String = capitalizedTriplets
+        val port_removed = if (scheme == "http")
+            initial.replace(":80", "")
+        else
+            if (scheme == "https") initial.replace(":443", "") else initial
 
-            // Remove /../
-            val removedDots: String = decodedTriplets
+        // Capitalize letters in % encoded triplets
+        val capitalizedTriplets: String = capitalizeEncodedTriplets(port_removed)
 
-            return removedDots
+        // Decode % encoded triplets of unreserved characters
+        val decodedTriplets: String = decodeUnintendedTriplets(capitalizedTriplets)
+
+        // Remove /../
+        val removedDots: String = decodedTriplets.replace("/../", "/").replace("/./", "/")
+
+        return removedDots
+    }
+
+    // Decode octets of unreserved characters
+    // Unreserved characters are %41-%5A, %61-7A, %30-%39, %2D, %2E, %5F, %7E
+    internal fun decodeUnintendedTriplets(url: String): String {
+        val replaceList: List<String> = listOf(
+                (0x41..0x5A),
+                (0x61..0x7A),
+                (0x30..0x39),
+                listOf(0x2D, 0x2E, 0x5F, 0x7E))
+                .flatten()
+                .map { Integer.toHexString(it) }
+                .map { "%" + it }
+
+        var ret = url
+        replaceList.forEach { it: String ->
+            ret = ret.replace(it, Integer.parseInt(it.slice(1 until it.length), 16).toChar().toString(), true)
         }
 
-    val canonicalForm: String = TODO()
+        return  ret
+    }
+
+    internal fun capitalizeEncodedTriplets(url: String): String {
+        // Split on the percents
+        return url.split("%")
+                // Anything before the first % is untouched
+                .mapIndexed { i, s -> if (i == 0) s else
+                // Anything after should have the following TWO characters uppercased and rejoined
+                    s.mapIndexed { i, c -> if (i < 2) c.toUpperCase() else c }.joinToString("") }
+                // And rejoin everything with %s again
+                .joinToString("%")
+    }
+
+    val canonicalForm: String = normalForm
 
     private val idn: InternetDomainName? = try {
         InternetDomainName.from(this.host)
