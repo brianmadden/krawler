@@ -52,7 +52,7 @@ class KrawlHistoryHSQLDao(session: Session):
     init {
         // Create queue table
         session.update("CREATE TABLE IF NOT EXISTS KrawlHistory " +
-                "(id INT IDENTITY, url VARCHAR(255), timestamp TIMESTAMP)")
+                "(id INT IDENTITY, url VARCHAR(2048), timestamp TIMESTAMP)")
     }
 
     override fun insert(url: KrawlUrl): KrawlHistoryEntry {

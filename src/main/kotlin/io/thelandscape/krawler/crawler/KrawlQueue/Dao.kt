@@ -58,7 +58,7 @@ class KrawlQueueHSQLDao(session: Session,
     init {
         // Create queue table
         session.update("CREATE TABLE IF NOT EXISTS krawlQueue " +
-                "(url VARCHAR(255) NOT NULL, parent INT, depth INT, timestamp TIMESTAMP)")
+                "(url VARCHAR(2048) NOT NULL, parent INT, depth INT, timestamp TIMESTAMP)")
     }
 
     override fun pop(): QueueEntry? {
