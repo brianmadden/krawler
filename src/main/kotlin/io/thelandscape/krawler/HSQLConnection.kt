@@ -20,6 +20,7 @@ package io.thelandscape.krawler
 
 import com.github.andrewoma.kwery.core.ThreadLocalSession
 import com.github.andrewoma.kwery.core.dialect.HsqlDialect
+import com.github.andrewoma.kwery.core.interceptor.LoggingInterceptor
 import com.mchange.v2.c3p0.ComboPooledDataSource
 import java.time.LocalDateTime
 
@@ -40,4 +41,4 @@ private class HSQLConnection(fileBacked: Boolean, fileName: String = ".krawl_tmp
 }
 
 private val connection = HSQLConnection(false).cpds
-internal val hsqlSession: ThreadLocalSession = ThreadLocalSession(connection, HsqlDialect())
+internal val hsqlSession: ThreadLocalSession = ThreadLocalSession(connection, HsqlDialect(), LoggingInterceptor())

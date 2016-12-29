@@ -17,9 +17,10 @@
         </Console>
     </Appenders>
     <Loggers>
-        <Root level="debug">
-            <AppenderRef ref="Console" />
-            <AppenderRef ref="RollingFile"/>
+        <Root level="fatal">
+            <!--<AppenderRef ref="Console" />
+            <AppenderRef ref="RollingFile"/>-->
         </Root>
+        <logger name="org.apache.http.client.protocol.ResponseProcessCookies" level="fatal"></logger>
     </Loggers>
 </Configuration>

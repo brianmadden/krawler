@@ -17,12 +17,21 @@
  */
 
 import io.thelandscape.krawler.crawler.KrawlConfig
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
+import java.time.LocalTime
 
 fun main(args: Array<String>) {
 
-    val config: KrawlConfig = KrawlConfig(totalPages = 5)
+    val logger: Logger = LogManager.getLogger("krawlerExample")
+
+
+    val config: KrawlConfig = KrawlConfig(totalPages = 10, numThreads = 1)
     val k = ExampleKrawler(config)
 
+    val start: LocalTime = LocalTime.now()
     k.start("http://en.wikipedia.org/")
+    val end: LocalTime = LocalTime.now()
+    print("Total: ${end.toSecondOfDay() - start.toSecondOfDay()} seconds...")
 
 }

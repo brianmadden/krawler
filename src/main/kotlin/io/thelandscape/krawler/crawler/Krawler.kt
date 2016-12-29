@@ -209,13 +209,14 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
     var visitCount: Int = 0
         get() = visitCountLock.read { field }
-        private set(value) = visitCountLock.write { field = value }
+        private set(value) = visitCountLock.write {
+            // If we're setting the visit count to the configured number of
+            // pages to crawl, flip the switch to stop crawling
+            if (value == config.totalPages)
+                continueCrawling = false
 
-    private val checkCountLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
-
-    var checkCount: Int = 0
-        get() = checkCountLock.read { field }
-        private set(value) = checkCountLock.write { field = value }
+            field = value
+        }
 
     // Lock to enforce politeness
     private val politeLock: ReentrantLock = ReentrantLock()
@@ -227,11 +228,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         var emptyQueueWaitCount: Int = 0
 
         while(continueCrawling) {
-
-            // Quit if global threshold met
-            if (visitCount == config.totalPages)
-                break
-
             // Pop a URL off the queue
             var qe: QueueEntry? = queue.politePop()
             if (qe == null) {
@@ -242,7 +238,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                     emptyQueueWaitCount++
 
                     // Try to pop again
-                    qe = queue.pop()
+                    qe = queue.politePop()
 
                     // If we have something, reset the count and move on
                     if (qe != null) {
@@ -305,7 +301,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             // If we're supposed to check this, get the status code and call check
             if (shouldCheck(krawlUrl)) {
                 // Increment the check count
-                checkCount += 1
+                visitCount += 1
 
                 val doc: RequestResponse = requestProvider.checkUrl(krawlUrl)
 
