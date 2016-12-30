@@ -32,7 +32,7 @@ private val db = dbf.newDocumentBuilder()
 
 interface RequestResponse
 
-class ErrorResponse() : RequestResponse
+class ErrorResponse : RequestResponse
 class KrawlDocument(private val response: HttpResponse) : RequestResponse {
 
     constructor(response: HttpResponse, parent: KrawlUrl): this(response) {

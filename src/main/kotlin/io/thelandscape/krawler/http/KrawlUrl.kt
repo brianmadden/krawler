@@ -133,7 +133,9 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
                 while (url.getOrElse(idx + portIdxAdder, { ' ' }).isDigit()) {
                     portIdxAdder++
                 }
-                port = url.slice(idx + 1 until idx + portIdxAdder).toInt()
+
+                val slice = url.slice(idx + 1 until idx + portIdxAdder)
+                port = if (slice.isNotBlank()) slice.toInt() else port
 
                 // Increment the index and move on
                 idx += portIdxAdder

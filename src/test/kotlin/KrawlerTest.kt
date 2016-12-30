@@ -32,7 +32,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ThreadFactory
 import kotlin.test.assertEquals
 
-class MockQueue() : KrawlQueueIf {
+class MockQueue : KrawlQueueIf {
     val back: MutableList<QueueEntry> = mutableListOf()
 
     override fun pop(): QueueEntry? {
