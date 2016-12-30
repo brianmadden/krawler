@@ -21,7 +21,6 @@ package io.thelandscape.krawler
 import com.github.andrewoma.kwery.core.ThreadLocalSession
 import com.github.andrewoma.kwery.core.dialect.HsqlDialect
 import com.github.andrewoma.kwery.core.interceptor.LoggingInterceptor
-import com.mchange.v2.c3p0.ComboPooledDataSource
 import com.zaxxer.hikari.HikariDataSource
 import java.time.LocalDateTime
 import com.zaxxer.hikari.HikariConfig
