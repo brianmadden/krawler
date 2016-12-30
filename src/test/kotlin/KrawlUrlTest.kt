@@ -74,7 +74,7 @@ class KrawlUrlTest {
 
     @Test fun testSubdomain() = assertEquals("www.xyz", testUrl.subdomain)
 
-    @Test fun testPath() = assertEquals("/../%7Ezyxzzy/./abc%3a", testUrl.path)
+    @Test fun testPath() = assertEquals("/~zyxzzy/abc%3A", testUrl.path)
 
     @Test fun testHost() = assertEquals("www.xyz.abc.com", testUrl.host)
 

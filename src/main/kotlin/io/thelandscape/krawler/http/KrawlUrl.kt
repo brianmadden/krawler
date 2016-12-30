@@ -74,104 +74,173 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
     // http://www.ietf.org/rfc/rfc2396.txt
     // URI syntax: [scheme:]scheme-specific-part[#fragment]
 
+    private var firstColonFound: Boolean = false
     // Absolute URLs start with a / immediately after the scheme portion
-    val isAbsolute: Boolean = url.split(":").getOrElse(1, {""}).startsWith("/")
+    var isAbsolute: Boolean = false
+        private set
 
-    // For our purposes all URLs are http(s) so if it isn't absolute assume http
-    // CASE INSENSITIVE -- convert to lowercase for normalization
-    val scheme: String = if(isAbsolute) url.split("://").first().toLowerCase() else parent?.scheme ?: "http"
+    var scheme: String = "http"
+        private set
 
     // Host is the part between the :// and the first /
-    // NORMALIZATION: convert to lowercase for normalization
-    val host: String = if(isAbsolute) url.split("://")
-            .getOrElse(1, { "" })
-            .split("/")
-            .first()
-            .toLowerCase()
-            .replace(Regex(":[0-9]+"), "") else parent?.host ?: ""
+    var host: String = ""
+        private set
 
-    // Get the port information
-    val port: Int = host.split(":").getOrElse(1, { if (scheme == "http") "80" else "443" }).toInt()
+    var port: Int = 0
+        private set
 
-    // The path is the part after the host (starting with the first / after the host)
-    val path: String = if(isAbsolute)
-        url.replace(scheme + "://" + host, "", true).dropWhile { it != '/' }
-    else url
+    var path: String = url
+        private set
 
-    // The normal form doesn't contain any /./ or /../
-    val normalForm: String = normalize(scheme, host, path)
+    init {
+        // Process the URL in one shot as best we can by treating it like a big state machine
+        // This will handle the normalization process in-line to prevent excessive string mutations
+        var idx: Int = 0
+        var hostStart: Int = 0
 
-    // Do the work to normalize the URL we're working with
-    // TODO: Make this public and part of a companion object?
-    internal fun normalize(scheme: String, host: String, path: String): String {
-        val initial: String = scheme + "://" + host + path
-
-        val port_removed = if (scheme == "http")
-            initial.replace(":80", "")
-        else
-            if (scheme == "https") initial.replace(":443", "") else initial
-
-        // Capitalize letters in % encoded triplets
-        val capitalizedTriplets: String = capitalizeEncodedTriplets(port_removed)
-
-        // Decode % encoded triplets of unreserved characters
-        val decodedTriplets: String = decodeUnintendedTriplets(capitalizedTriplets)
-
-        // Remove /../
-        val removedDots: String = decodedTriplets.replace("/../", "/").replace("/./", "/")
-
-        return removedDots
-    }
-
-    // Decode octets of unreserved characters
-    // Unreserved characters are %41-%5A, %61-7A, %30-%39, %2D, %2E, %5F, %7E
-    internal fun decodeUnintendedTriplets(url: String): String {
+        // Used for decoding encoded characters
         val replaceList: List<Int> = listOf(
                 (0x41..0x5A),
                 (0x61..0x7A),
                 (0x30..0x39),
                 listOf(0x2D, 0x2E, 0x5F, 0x7E))
                 .flatten()
-                // .map { Integer.toHexString(it) }
-                // .map { "%" + it }
 
-        var ret = url
+        while(idx < url.length) {
+            val c = url[idx]
 
-        var idxs: MutableMap<Int, Char> = mutableMapOf()
-        url.forEachIndexed { i, c ->
-            if (c == '%') {
-                val chr = Integer.parseInt(url.slice(i+1 .. i+2), 16)
-                if (chr in replaceList)
-                    idxs[i] = chr.toChar()
+            // Handle isAbsolute and finding the scheme
+            if (!firstColonFound && c == ':') {
+                firstColonFound = true
+                // If the first colon was found the scheme is everything up until then
+                // NORMALIZE: Scheme should all be lowercase
+                scheme = url.slice(0 until idx).toLowerCase()
+                if (url.getOrNull(idx + 1) == '/' && url.getOrNull(idx + 2) == '/') {
+                    isAbsolute = true
+                    // Move idx by 3 to the start of the host portion
+                    idx += 3
+                    // Start the host after the scheme
+                    hostStart = idx
+                    continue
+                }
             }
+
+            // Find the port if it's present
+            if (firstColonFound && c == ':') {
+                // This should be the port
+                var portIdxAdder = 1
+                // Get all of the digits after the colon
+                while (url.getOrElse(idx + portIdxAdder, { ' ' }).isDigit()) {
+                    portIdxAdder++
+                }
+                port = url.slice(idx + 1 until idx + portIdxAdder).toInt()
+
+                // Increment the index and move on
+                idx += portIdxAdder
+                continue
+            }
+
+            // Everything up until the port is the host portion
+            if (c == '/') {
+                // NORMALIZATION: convert to lowercase for normalization
+                // NORMALIZATION: Remove the port if the scheme is http
+                host = url.slice(hostStart until idx)
+                        .toLowerCase()
+                        .replace(Regex(":[0-9]+"), "")
+
+                path = url.slice(idx until url.length)
+
+                // If we've come this far we're ready to process the path
+                break
+            }
+
+            // Increment idx if we didn't do any special handling
+            idx++
+
+            // End the initial processing. From here we'll only process the path.
+            // This will also be treated as a state machine for single pass processing
         }
 
-        idxs.forEach { it ->
-            ret = ret.slice(0 until it.key) + it.value + ret.slice(it.key+3 until ret.length)
+        // Reset idx
+        idx = 0
+        while(idx < path.length) {
+            val c = path[idx]
+            // Handle normalization of path from here on out
+            if (c == '%') {
+                val nextTwo: Int =
+                        Integer.parseInt("" + path.getOrElse(idx + 1, {' '}) + path.getOrElse(idx + 2, {' '}), 16)
+
+                // NORMALIZATION:
+                // We've hit an encoded character, decide whether or not to decode (non-reserved chars)
+                // Unreserved characters are %41-%5A, %61-7A, %30-%39, %2D, %2E, %5F, %7E
+                if (nextTwo in replaceList) {
+                    if (idx + 3 < path.length)
+                        path = path.slice(0 until idx) + nextTwo.toChar() + path.slice(idx + 3 until path.length)
+                    else
+                        path = path.slice(0 until idx) + nextTwo.toChar()
+                    // Only increment by 1 since we replaced 3 characters with 1
+                    idx ++
+                    continue
+                }
+
+                // NORMALIZATION: If they weren't converted make sure they're upper case
+                if (idx + 3 < url.length)
+                    path = path.slice(0 .. idx) +
+                            Integer.toHexString(nextTwo).toUpperCase() +
+                            path.slice(idx + 3 until path.length)
+                else
+                    path = path.slice(0 .. idx) + Integer.toHexString(nextTwo).toUpperCase()
+
+                idx += 3
+                continue
+            }
+
+            if (c == '/') {
+                // TODO: Remove excess slashes after a slash
+
+                // NORMALIZATION: Remove any /../ or /./
+                val nextTwo = "" + path.getOrElse(idx + 1, {' '}) + path.getOrElse(idx + 2, {' '})
+
+                if (nextTwo == "./") {
+                    path = path.slice(0 until idx) + path.slice(idx + 2 until path.length)
+
+                    continue
+                }
+
+                if (nextTwo == "..") {
+                    if (idx + 3 < path.length)
+                        path = path.slice(0 until idx) + path.slice(idx + 3 until path.length)
+                    else
+                        path = path.slice(0 until idx)
+
+                    continue
+                }
+            }
+
+            // If we didn't do anything, just increment the index
+            idx++
         }
 
-        return  ret
+        // Handle URLs that didn't have a port at all
+        if (port == 0) {
+            if ("http" == scheme) port = 80
+            if ("https" == scheme) port = 443
+        }
     }
 
-    internal fun capitalizeEncodedTriplets(url: String): String {
-        // Split on the percents
-        return url.split("%")
-                // Anything before the first % is untouched
-                .mapIndexed { i, s -> if (i == 0) s else
-                // Anything after should have the following TWO characters uppercased and rejoined
-                    s.mapIndexed { i, c -> if (i < 2) c.toUpperCase() else c }.joinToString("") }
-                // And rejoin everything with %s again
-                .joinToString("%")
-    }
-
-    private val idn: InternetDomainName? = try {
-        InternetDomainName.from(this.host)
-    } catch (e: Throwable) {
-        null
-    }
+    // The normal form doesn't contain any /./ or /../
+    val normalForm: String = "$scheme://$host$path" // normalize(scheme, host, path)
 
     // Get a list of TLDs from https://publicsuffix.org/list/public_suffix_list.dat
     // These are all lazy because the suffix finder is a bit of an expensive operation that isn't always necessary.
+    private val idn: InternetDomainName? by lazy {
+        try {
+            InternetDomainName.from(this.host)
+        } catch (e: Throwable) {
+            null
+        }
+    }
+
     val suffix: String by lazy { idn?.publicSuffix().toString() }
     val domain: String by lazy { host.replace("." + suffix, "").split(".").last() + "." + suffix }
     val subdomain: String by lazy { host.replace("." + domain, "") }
