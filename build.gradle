@@ -36,7 +36,7 @@ project(":") {
         compile "com.github.andrewoma.kwery:fetcher:0.15"
         compile "com.github.andrewoma.kwery:mapper:0.15"
 
-        compile "com.mchange:c3p0:0.9.5.2"
+        compile group: 'com.zaxxer', name: 'HikariCP', version: '2.5.1'
 
         compile group: 'com.google.guava', name: 'guava', version: '19.0'
 

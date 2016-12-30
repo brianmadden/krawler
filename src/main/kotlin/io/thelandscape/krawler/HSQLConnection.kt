@@ -22,23 +22,36 @@ import com.github.andrewoma.kwery.core.ThreadLocalSession
 import com.github.andrewoma.kwery.core.dialect.HsqlDialect
 import com.github.andrewoma.kwery.core.interceptor.LoggingInterceptor
 import com.mchange.v2.c3p0.ComboPooledDataSource
+import com.zaxxer.hikari.HikariDataSource
 import java.time.LocalDateTime
+import com.zaxxer.hikari.HikariConfig
+
+
 
 private class HSQLConnection(fileBacked: Boolean, fileName: String = ".krawl_tmp") {
-    val cpds: ComboPooledDataSource = ComboPooledDataSource()
+
+    var ds: HikariDataSource = HikariDataSource()
+        private set
 
     init {
+        val config = HikariConfig()
+
         if (fileBacked)
-            cpds.jdbcUrl = "jdbc:hsqldb:file:$fileName"
+            config.jdbcUrl = "jdbc:hsqldb:file:$fileName"
         else
-            cpds.jdbcUrl = "jdbc:hsqldb:mem:${LocalDateTime.now().hashCode()}"
-        cpds.user = ""
-        cpds.password = ""
-        cpds.maxConnectionAge = 600
-        cpds.isTestConnectionOnCheckin = true
-        cpds.idleConnectionTestPeriod = 500
+            config.jdbcUrl = "jdbc:hsqldb:mem:${LocalDateTime.now().hashCode()}"
+
+        config.username = ""
+        config.password = ""
+        config.addDataSourceProperty("cachePrepStmts", "true")
+        config.addDataSourceProperty("prepStmtCacheSize", "250")
+        config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048")
+
+        ds = HikariDataSource(config)
     }
 }
 
-private val connection = HSQLConnection(false).cpds
+
+
+private val connection = HSQLConnection(false).ds
 internal val hsqlSession: ThreadLocalSession = ThreadLocalSession(connection, HsqlDialect(), LoggingInterceptor())

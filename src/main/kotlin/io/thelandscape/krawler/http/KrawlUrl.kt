@@ -126,18 +126,28 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
     // Decode octets of unreserved characters
     // Unreserved characters are %41-%5A, %61-7A, %30-%39, %2D, %2E, %5F, %7E
     internal fun decodeUnintendedTriplets(url: String): String {
-        val replaceList: List<String> = listOf(
+        val replaceList: List<Int> = listOf(
                 (0x41..0x5A),
                 (0x61..0x7A),
                 (0x30..0x39),
                 listOf(0x2D, 0x2E, 0x5F, 0x7E))
                 .flatten()
-                .map { Integer.toHexString(it) }
-                .map { "%" + it }
+                // .map { Integer.toHexString(it) }
+                // .map { "%" + it }
 
         var ret = url
-        replaceList.forEach { it: String ->
-            ret = ret.replace(it, Integer.parseInt(it.slice(1 until it.length), 16).toChar().toString(), true)
+
+        var idxs: MutableMap<Int, Char> = mutableMapOf()
+        url.forEachIndexed { i, c ->
+            if (c == '%') {
+                val chr = Integer.parseInt(url.slice(i+1 .. i+2), 16)
+                if (chr in replaceList)
+                    idxs[i] = chr.toChar()
+            }
+        }
+
+        idxs.forEach { it ->
+            ret = ret.slice(0 until it.key) + it.value + ret.slice(it.key+3 until ret.length)
         }
 
         return  ret
@@ -161,16 +171,17 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
     }
 
     // Get a list of TLDs from https://publicsuffix.org/list/public_suffix_list.dat
-    val suffix: String = idn?.publicSuffix().toString()
-
-    val domain: String = host.replace("." + suffix, "").split(".").last() + "." + suffix
-
-    val subdomain: String = host.replace("." + domain, "")
+    // These are all lazy because the suffix finder is a bit of an expensive operation that isn't always necessary.
+    val suffix: String by lazy { idn?.publicSuffix().toString() }
+    val domain: String by lazy { host.replace("." + suffix, "").split(".").last() + "." + suffix }
+    val subdomain: String by lazy { host.replace("." + domain, "") }
 
     // Create a canonical form that we can use to better determine if a URL has been seen before
+    // TODO: Decide to add or remove / at end of URL -- this may change semantics on some web servers
+    // if (normalForm.endsWith(suffix)) normalForm + "/" else normalForm
     // TODO: Remove ? if no query parameters follow
     // TODO: Remove duplicate / other than after scheme portion
-    val canonicalForm: String = if (normalForm.endsWith(suffix)) normalForm + "/" else normalForm
+    val canonicalForm: String = normalForm
 
     override fun toString(): String = canonicalForm
 

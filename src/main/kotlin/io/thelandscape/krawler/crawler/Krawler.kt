@@ -222,7 +222,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     private val politeLock: ReentrantLock = ReentrantLock()
     // Extension function to make pop polite
     private fun KrawlQueueIf.politePop(): QueueEntry? =
-            politeLock.withPoliteLock(config.politenessDelay) { queue.pop() }
+            politeLock.withPoliteLock(0) { queue.pop() }
+            // politeLock.withPoliteLock(config.politenessDelay) { queue.pop() }
 
     internal fun doCrawl() {
         var emptyQueueWaitCount: Int = 0
