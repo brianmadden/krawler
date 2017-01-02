@@ -19,12 +19,15 @@
 package io.thelandscape.krawler.http
 
 import org.apache.http.HttpResponse
+import org.apache.http.client.config.CookieSpecs
+import org.apache.http.client.config.RequestConfig
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.client.methods.HttpHead
 import org.apache.http.client.methods.HttpUriRequest
 import org.apache.http.impl.client.CloseableHttpClient
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
+import org.apache.http.impl.cookie.IgnoreSpec
 
 interface RequestProviderIf {
     /**
@@ -40,11 +43,14 @@ interface RequestProviderIf {
 
 val Request: Requests = Requests()
 private val pcm: PoolingHttpClientConnectionManager = PoolingHttpClientConnectionManager()
+private val requestConfig = RequestConfig.custom().setCookieSpec(CookieSpecs.STANDARD).build()
 
 // TODO: Clean up the connection pool somewhere
 
 class Requests(val httpClient: CloseableHttpClient =
-               HttpClients.custom().setConnectionManager(pcm).build()) : RequestProviderIf {
+               HttpClients.custom()
+                       .setDefaultRequestConfig(requestConfig)
+                       .setConnectionManager(pcm).build()) : RequestProviderIf {
 
     /** Check a URL and return it's status code
      * @param url KrawlUrl: the url to check
@@ -69,12 +75,12 @@ class Requests(val httpClient: CloseableHttpClient =
      */
     private fun requestAndClose(url: KrawlUrl,
                                 reqFun: (String) -> HttpUriRequest,
-                                retFun: (HttpResponse) -> RequestResponse): RequestResponse {
+                                retFun: (KrawlUrl, HttpResponse) -> RequestResponse): RequestResponse {
 
         val req: HttpUriRequest = reqFun(url.canonicalForm)
         val resp: RequestResponse = try {
             val response: HttpResponse? = httpClient.execute(req)
-            if (response == null) ErrorResponse() else retFun(response)
+            if (response == null) ErrorResponse(url) else retFun(url, response)
         } catch (e: Exception) {
             throw ContentFetchError(url, e)
         }

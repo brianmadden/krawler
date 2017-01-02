@@ -48,6 +48,7 @@ class MockQueue : KrawlQueueIf {
 
 class KrawlerTest {
 
+    val exampleUrl = KrawlUrl.new("http://www.example.org")
     val mockConfig = KrawlConfig(emptyQueueWaitTime = 1)
     val mockQueue = MockQueue()
     val mockHistory = mock<KrawlHistoryIf>()
@@ -55,7 +56,7 @@ class KrawlerTest {
     val mockThreadfactory = mock<ThreadFactory>()
     val mockThreadpool = Executors.newCachedThreadPool(mockThreadfactory)
 
-    val preparedResponse = KrawlDocument(prepareResponse(200, ""))
+    val preparedResponse = KrawlDocument(exampleUrl, prepareResponse(200, ""))
 
     class testCrawler(x: KrawlConfig, y: KrawlQueueIf,
                       w: KrawlHistoryIf, v: RequestProviderIf, z: ExecutorService): Krawler(x, y, w, v, z) {

@@ -17,8 +17,9 @@
  */
 
 import io.thelandscape.krawler.http.KrawlUrl
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
 import org.junit.Test
-import org.w3c.dom.Element
 import java.io.ByteArrayInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.test.assertEquals
@@ -29,9 +30,7 @@ class KrawlUrlTest {
 
     private val anchorNode: String = "<a href='http://www.google.com/./zxyzzy' " +
             "rel='canonical' target='blank'>Anchor Text</a>"
-    private val dbf = DocumentBuilderFactory.newInstance()
-    private val db = dbf.newDocumentBuilder()
-    private val doc: Element = db.parse(ByteArrayInputStream(anchorNode.toByteArray())).documentElement
+    private val doc: Element = Jsoup.parse(anchorNode).getElementsByTag("a").first()
 
     val rawUrl = "HTTP://www.xyz.ABC.com:80/../%7Ezyxzzy/./abc%3a"
     val testUrl = KrawlUrl.new(rawUrl)

@@ -52,9 +52,10 @@ private val parent: KrawlUrl = KrawlUrl.new("http://www.parent.com/")
 
 class CrawlDocumentTest {
 
-    val doc: KrawlDocument = KrawlDocument(mockReturn)
-    val emptyDoc: KrawlDocument = KrawlDocument(mockEmptyReturn, parent)
-    val four04Doc: KrawlDocument = KrawlDocument(mock404Return)
+    val url: KrawlUrl = KrawlUrl.Companion.new("http://www.example.org")
+    val doc: KrawlDocument = KrawlDocument(url, mockReturn)
+    val emptyDoc: KrawlDocument = KrawlDocument(url, mockEmptyReturn, parent)
+    val four04Doc: KrawlDocument = KrawlDocument(url, mock404Return)
 
     // All docs should have a headers property
     @Test fun testHeadersProperty() {
@@ -85,7 +86,7 @@ class CrawlDocumentTest {
         // Doc should only have one anchor tag
         assertEquals(1, doc.anchorTags.size)
         // The href property should point to google
-        assertEquals("http://www.google.com", doc.anchorTags.first().getAttribute("href"))
+        assertEquals("http://www.google.com", doc.anchorTags.first().attr("href"))
 
         // Empty doc should have no links
         assertTrue { emptyDoc.anchorTags.isEmpty() }

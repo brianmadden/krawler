@@ -1,12 +1,3 @@
-package io.thelandscape.krawler.http
-
-import org.apache.http.HttpResponse
-import org.apache.http.util.EntityUtils
-import org.w3c.dom.Document
-import org.w3c.dom.Element
-import org.w3c.dom.NodeList
-import java.io.ByteArrayInputStream
-import javax.xml.parsers.DocumentBuilderFactory
 
 /**
  * Created by brian.a.madden@gmail.com on 10/26/16.
@@ -26,16 +17,27 @@ import javax.xml.parsers.DocumentBuilderFactory
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+package io.thelandscape.krawler.http
+
+import org.apache.http.HttpResponse
+import org.apache.http.util.EntityUtils
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
+import org.jsoup.select.Elements
+import java.io.ByteArrayInputStream
+import javax.xml.parsers.DocumentBuilderFactory
+
 // Only need these once for all documents
 private val dbf = DocumentBuilderFactory.newInstance()
 private val db = dbf.newDocumentBuilder()
 
 interface RequestResponse
 
-class ErrorResponse : RequestResponse
-class KrawlDocument(private val response: HttpResponse) : RequestResponse {
+data class ErrorResponse(val url: KrawlUrl) : RequestResponse
+class KrawlDocument(val url: KrawlUrl, response: HttpResponse) : RequestResponse {
 
-    constructor(response: HttpResponse, parent: KrawlUrl): this(response) {
+    constructor(url: KrawlUrl, response: HttpResponse, parent: KrawlUrl): this(url, response) {
         this.parent = parent
     }
 
@@ -43,13 +45,12 @@ class KrawlDocument(private val response: HttpResponse) : RequestResponse {
      * URL of the parent of this page
      */
     var parent: KrawlUrl? = null
-        get() = field
-        private set(value) { field = value }
+        private set
+
     /**
      * Http headers
      */
-    val headers: Map<String, String>
-        get() = response.allHeaders.associate { it.name to it.value }
+    val headers: Map<String, String> = response.allHeaders.associate { it.name to it.value }
 
     /**
      * Raw HTML
@@ -59,31 +60,24 @@ class KrawlDocument(private val response: HttpResponse) : RequestResponse {
     /**
      * Status code
      */
-    val statusCode: Int
-        get() = response.statusLine.statusCode
+    val statusCode: Int = response.statusLine.statusCode
 
     /**
      * Anchor tags that have the href attribute
      */
-    val anchorTags: List<Element>
-        get() {
-            val parsed: Document = try {
-                val ba: ByteArrayInputStream = ByteArrayInputStream(rawHtml.toByteArray())
-                db.parse(ba)
-            } catch (e: Throwable) {
-                return listOf()
-            }
-
-            return parsed.getElementsByTagName("a").toElementList().filter { it.hasAttribute("href") }
-        }
+    val anchorTags: List<Element> = if (rawHtml.isNullOrEmpty()) listOf() else try {
+        val doc: Document = Jsoup.parse(rawHtml)
+        doc.getElementsByTag("a").toElementList().filter { it.hasAttr("href") }
+    } catch (e: Throwable) {
+        println("Failed parsing ${url.canonicalForm}:  ${e.message}")
+        listOf<Element>()
+    }
 
     /// Utility method to convert a NodeList to a List<Element>
-    internal fun NodeList.toElementList(): List<Element> {
-        if (this.length == 0) return listOf()
+    internal fun Elements.toElementList(): List<Element> {
+        if (this.size == 0) return listOf()
 
-        return (0..this.length - 1)
-                .map { this.item(it) }
-                .map { it as Element }
+        return (0..this.size - 1).map { this[it] }
     }
 }
 

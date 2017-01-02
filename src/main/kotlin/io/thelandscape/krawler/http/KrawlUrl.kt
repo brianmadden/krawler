@@ -1,9 +1,7 @@
 package io.thelandscape.krawler.http
 
 import com.google.common.net.InternetDomainName
-import org.w3c.dom.Element
-import java.net.URI
-import org.w3c.dom.Node
+import org.jsoup.nodes.Element
 
 
 /**
@@ -40,7 +38,7 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
         }
 
         fun new(anchor: Element, parent: KrawlUrl? = null): KrawlUrl? {
-            if (anchor.tagName != "a" && !anchor.hasAttribute("href"))
+            if (anchor.tagName() != "a" && !anchor.hasAttr("href"))
                 return null
             return KrawlUrl(anchor, parent)
         }
@@ -57,16 +55,11 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
         private set
 
     // Constructor used when we pass a full anchor tag in
-    private constructor(anchor: Element, parent: KrawlUrl?): this(anchor.getAttribute("href"), parent) {
+    private constructor(anchor: Element, parent: KrawlUrl?): this(anchor.attr("href"), parent) {
 
         wasExtractedFromAnchor = true
-        // Anchor text is actually contained within the first child node
-        anchorText = anchor.textContent ?: ""
-        // Attributes are a map of Nodes where each Node is an Attribute
-        // (https://docs.oracle.com/javase/8/docs/api/org/w3c/dom/Node.html)
-        anchorAttributes = (0..anchor.attributes.length - 1).associate {
-            anchor.attributes.item(it).nodeName to anchor.attributes.item(it).nodeValue
-        }
+        anchorText = anchor.text() ?: ""
+        anchorAttributes = anchor.attributes().associateBy({ it.key }, { it.value })
     }
 
     val rawUrl: String = url
@@ -245,8 +238,7 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
         }
     }
 
-    // The normal form doesn't contain any /./ or /../
-    val normalForm: String = "$scheme://$host$path" // normalize(scheme, host, path)
+    val normalForm: String = if (host + path == "") "" else "$scheme://$host$path"
 
     // Get a list of TLDs from https://publicsuffix.org/list/public_suffix_list.dat
     // These are all lazy because the suffix finder is a bit of an expensive operation that isn't always necessary.

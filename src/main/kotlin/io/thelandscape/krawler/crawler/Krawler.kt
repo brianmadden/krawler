@@ -136,7 +136,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * Arbitrary data structure associated with this crawl to provide context or a shared
      * resource.
      */
-    open protected var crawlContext: Any? = null
+    open var crawlContext: Any? = null
 
     fun start(seedUrl: String) = start(listOf(seedUrl))
 
@@ -285,7 +285,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
                 // Parse out the URLs and construct queue entries from them
                 val links: List<QueueEntry> = doc.anchorTags
-                        .filterNot { it.getAttribute("href").startsWith("#") }
+                        .filterNot { it.attr("href").startsWith("#") }
                         .map { KrawlUrl.new(it, krawlUrl) }
                         .filterNotNull()
                         .filter { it.canonicalForm.isNotBlank() }
