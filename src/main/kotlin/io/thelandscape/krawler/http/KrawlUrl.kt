@@ -97,6 +97,7 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
         // This will handle the normalization process in-line to prevent excessive string mutations
         var idx: Int = 0
         var hostStart: Int = 0
+        var hostFound: Boolean = false
 
         // Used for decoding encoded characters
         val replaceList: List<Int> = listOf(
@@ -150,6 +151,8 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
                         .toLowerCase()
                         .replace(Regex(":[0-9]+"), "")
 
+                hostFound = true
+
                 path = url.slice(idx until url.length)
 
                 // If we've come this far we're ready to process the path
@@ -161,6 +164,12 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
 
             // End the initial processing. From here we'll only process the path.
             // This will also be treated as a state machine for single pass processing
+        }
+
+
+        if (!hostFound) {
+            host = url.slice(hostStart until url.length)
+            path = ""
         }
 
         // Reset idx
@@ -243,7 +252,7 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
         }
     }
 
-    val suffix: String by lazy { idn?.publicSuffix().toString() }
+    val suffix: String by lazy { (idn?.publicSuffix() ?: "").toString() }
     val domain: String by lazy { host.replace("." + suffix, "").split(".").last() + "." + suffix }
     val subdomain: String by lazy { host.replace("." + domain, "") }
 

@@ -37,6 +37,16 @@ class KrawlUrlTest {
     val testUrl = KrawlUrl.new(rawUrl)
     val anchorTestUrl = KrawlUrl.new(doc)
 
+    @Test fun testPort() = assertEquals(testUrl.port, 80)
+
+    @Test fun testUrlWithNoPath() {
+        val noPath = KrawlUrl.new("http://www.example.org")
+        assertEquals("www.example.org", noPath.host)
+        assertEquals("example.org", noPath.domain)
+        assertEquals("www", noPath.subdomain)
+        assertEquals("", noPath.path)
+    }
+
     @Test fun testRawURL() = assertEquals(rawUrl, testUrl.rawUrl)
 
     @Test fun testCanonicalForm() {
@@ -66,6 +76,10 @@ class KrawlUrlTest {
         // Ensure capitalized encoded octets
         // Make sure we've removed the /../
         assertFalse(testUrl.normalForm.contains("///..//"))
+    }
+
+    @Test fun testScheme() {
+        assertEquals("http", testUrl.scheme)
     }
 
     @Test fun testSuffix() = assertEquals("com", testUrl.suffix)
