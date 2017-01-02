@@ -44,7 +44,24 @@ class KrawlUrlTest {
         assertEquals("www.example.org", noPath.host)
         assertEquals("example.org", noPath.domain)
         assertEquals("www", noPath.subdomain)
-        assertEquals("", noPath.path)
+        assertEquals("/", noPath.path)
+    }
+
+    @Test fun testUrlWithNoHost() {
+        val noHost = KrawlUrl.new("/relative/path", testUrl)
+        val noHost2 = KrawlUrl.new("relative/path", testUrl)
+
+        assertEquals("http://www.xyz.abc.com/relative/path", noHost.canonicalForm)
+        assertEquals("www.xyz.abc.com", noHost.host)
+        assertEquals("abc.com", noHost.domain)
+        assertEquals("/relative/path", noHost.path)
+
+        // Verify everything works without a leading / as well
+        assertEquals("http://www.xyz.abc.com/relative/path", noHost2.canonicalForm)
+        assertEquals("www.xyz.abc.com", noHost2.host)
+        assertEquals("abc.com", noHost2.domain)
+        assertEquals("/relative/path", noHost2.path)
+
     }
 
     @Test fun testRawURL() = assertEquals(rawUrl, testUrl.rawUrl)

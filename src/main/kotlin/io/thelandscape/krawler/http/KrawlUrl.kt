@@ -144,7 +144,7 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
             }
 
             // Everything up until the port is the host portion
-            if (c == '/') {
+            if (isAbsolute && c == '/') {
                 // NORMALIZATION: convert to lowercase for normalization
                 // NORMALIZATION: Remove the port if the scheme is http
                 host = url.slice(hostStart until idx)
@@ -166,10 +166,16 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
             // This will also be treated as a state machine for single pass processing
         }
 
-
-        if (!hostFound) {
+        // If no host was found but this is an absolute URL then the host is everything after the scheme
+        if (!hostFound && isAbsolute) {
             host = url.slice(hostStart until url.length)
-            path = ""
+            path = "/"
+        } else if (!hostFound && !isAbsolute) {
+            // If there host was not found and it is not an absolute URL the host comes from the parent
+            // and the entire URL is just a path
+            host = parent?.host ?: ""
+            // Add a leading slash if there wasn't one
+            path = if (path.startsWith("/")) path else "/" + path
         }
 
         // Reset idx
