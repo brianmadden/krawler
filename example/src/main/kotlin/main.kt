@@ -29,7 +29,7 @@ fun main(args: Array<String>) {
     val k = ExampleKrawler(config)
 
     val start: LocalTime = LocalTime.now()
-    k.start("http://reddit.com")
+    k.start("http://en.wikipedia.org")
     val end: LocalTime = LocalTime.now()
     print("Total: ${end.toSecondOfDay() - start.toSecondOfDay()} seconds...")
 

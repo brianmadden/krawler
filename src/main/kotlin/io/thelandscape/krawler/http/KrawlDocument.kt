@@ -69,7 +69,6 @@ class KrawlDocument(val url: KrawlUrl, response: HttpResponse) : RequestResponse
         val doc: Document = Jsoup.parse(rawHtml)
         doc.getElementsByTag("a").toElementList().filter { it.hasAttr("href") }
     } catch (e: Throwable) {
-        println("Failed parsing ${url.canonicalForm}:  ${e.message}")
         listOf<Element>()
     }
 

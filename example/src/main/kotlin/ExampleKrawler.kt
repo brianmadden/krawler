@@ -24,7 +24,7 @@ import io.thelandscape.krawler.http.KrawlUrl
 class ExampleKrawler(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
     override fun shouldVisit(url: KrawlUrl): Boolean {
-        return (url.domain == "reddit.com")
+        return (url.host == "en.wikipedia.org")
     }
 
     override fun shouldCheck(url: KrawlUrl): Boolean = false

@@ -18,15 +18,14 @@
 
 package io.thelandscape.krawler.crawler
 
+import io.thelandscape.krawler.crawler.History.KrawlHistory
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
-import io.thelandscape.krawler.crawler.History.KrawlHistory
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueDao
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
 import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
 import io.thelandscape.krawler.crawler.util.withPoliteLock
 import io.thelandscape.krawler.http.*
-import java.time.LocalDateTime
 import java.util.concurrent.*
 import java.util.concurrent.locks.ReentrantLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
