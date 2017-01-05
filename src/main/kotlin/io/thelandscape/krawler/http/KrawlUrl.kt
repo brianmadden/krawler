@@ -181,29 +181,29 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
             val c = path[idx]
             // Handle normalization of path from here on out
             if (c == '%') {
-                val nextTwo: Int =
-                        Integer.parseInt("" + path.getOrElse(idx + 1, {' '}) + path.getOrElse(idx + 2, {' '}), 16)
+                val nextTwoChars: String = path.slice(idx + 1 .. idx + 2)
+                if (nextTwoChars.matches(Regex("[0-9a-fA-F]{2}"))) {
+                    val nextTwo: Int = Integer.parseInt(nextTwoChars, 16)
 
-                // NORMALIZATION:
-                // We've hit an encoded character, decide whether or not to decode (non-reserved chars)
-                // Unreserved characters are %41-%5A, %61-7A, %30-%39, %2D, %2E, %5F, %7E
-                if (nextTwo in replaceList) {
-                    if (idx + 3 < path.length)
-                        path = path.slice(0 until idx) + nextTwo.toChar() + path.slice(idx + 3 until path.length)
-                    else
-                        path = path.slice(0 until idx) + nextTwo.toChar()
-                    // Only increment by 1 since we replaced 3 characters with 1
-                    idx ++
-                    continue
+                    // NORMALIZATION:
+                    // We've hit an encoded character, decide whether or not to decode (non-reserved chars)
+                    // Unreserved characters are %41-%5A, %61-7A, %30-%39, %2D, %2E, %5F, %7E
+                    if (nextTwo in replaceList) {
+                        if (idx + 3 < path.length)
+                            path = path.slice(0 until idx) + nextTwo.toChar() + path.slice(idx + 3 until path.length)
+                        else
+                            path = path.slice(0 until idx) + nextTwo.toChar()
+                        // Only increment by 1 since we replaced 3 characters with 1
+                        idx++
+                        continue
+                    }
                 }
 
                 // NORMALIZATION: If they weren't converted make sure they're upper case
                 if (idx + 3 < url.length)
-                    path = path.slice(0 .. idx) +
-                            Integer.toHexString(nextTwo).toUpperCase() +
-                            path.slice(idx + 3 until path.length)
+                    path = path.slice(0 .. idx) + nextTwoChars.toUpperCase() + path.slice(idx + 3 until path.length)
                 else
-                    path = path.slice(0 .. idx) + Integer.toHexString(nextTwo).toUpperCase()
+                    path = path.slice(0 .. idx) + nextTwoChars.toUpperCase()
 
                 idx += 3
                 continue

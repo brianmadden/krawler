@@ -47,6 +47,7 @@ class KrawlUrlTest {
     @Test fun testUrlWithNoHost() {
         val noHost = KrawlUrl.new("/relative/path", testUrl)
         val noHost2 = KrawlUrl.new("relative/path", testUrl)
+        val relWithColon = KrawlUrl.new("some/directory/Something:SomethingElse", testUrl)
 
         assertEquals("http://www.xyz.abc.com/relative/path", noHost.canonicalForm)
         assertEquals("www.xyz.abc.com", noHost.host)
@@ -59,6 +60,10 @@ class KrawlUrlTest {
         assertEquals("abc.com", noHost2.domain)
         assertEquals("/relative/path", noHost2.path)
 
+        // Verify everything works despite the colon and no scheme
+        assertEquals("http", relWithColon.scheme)
+        assertEquals("www.xyz.abc.com", relWithColon.host)
+        assertEquals("/some/directory/Something:SomethingElse", relWithColon.path)
     }
 
     @Test fun testRawURL() = assertEquals(rawUrl, testUrl.rawUrl)
