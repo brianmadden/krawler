@@ -43,7 +43,12 @@ interface RequestProviderIf {
 
 val Request: Requests = Requests()
 private val pcm: PoolingHttpClientConnectionManager = PoolingHttpClientConnectionManager()
-private val requestConfig = RequestConfig.custom().setCookieSpec(CookieSpecs.STANDARD).build()
+private val requestConfig = RequestConfig.custom()
+        .setCookieSpec(CookieSpecs.STANDARD)
+        .setExpectContinueEnabled(false)
+        .setContentCompressionEnabled(true)
+        .setRedirectsEnabled(true)
+        .build()
 
 // TODO: Clean up the connection pool somewhere
 

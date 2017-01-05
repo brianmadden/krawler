@@ -106,9 +106,13 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
             // Handle isAbsolute and finding the scheme
             if (!firstColonFound && c == ':') {
                 firstColonFound = true
+
                 // If the first colon was found the scheme is everything up until then
                 // NORMALIZE: Scheme should all be lowercase
-                scheme = url.slice(0 until idx).toLowerCase()
+                val validator: Regex = Regex("[A-Za-z][\\w+-.]*")
+                val slice = url.slice(0 until idx).toLowerCase()
+                scheme = if(validator.matches(slice)) slice else scheme
+
                 if (url.getOrNull(idx + 1) == '/' && url.getOrNull(idx + 2) == '/') {
                     isAbsolute = true
                     // Move idx by 3 to the start of the host portion
