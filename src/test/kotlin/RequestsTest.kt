@@ -20,18 +20,23 @@ import com.nhaarman.mockito_kotlin.any
 import com.nhaarman.mockito_kotlin.mock
 import com.nhaarman.mockito_kotlin.times
 import com.nhaarman.mockito_kotlin.verify
+import io.thelandscape.krawler.crawler.KrawlConfig
 import io.thelandscape.krawler.http.ContentFetchError
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.Requests
 import org.apache.http.impl.client.CloseableHttpClient
+import org.junit.Before
 import org.junit.Test
-
-private val mockHttpClient = mock<CloseableHttpClient> {}
+import java.time.Instant
+import kotlin.test.assertTrue
 
 class RequestsTest {
 
-    val request: Requests = Requests(mockHttpClient)
+    val mockHttpClient = mock<CloseableHttpClient> {}
+    val config: KrawlConfig = KrawlConfig()
+    val request: Requests = Requests(config, mockHttpClient)
     val testUrl = KrawlUrl.new("http://httpbin.org")
+    val testUrl2 = KrawlUrl.new("http://httpbin.org/get")
 
     @Test fun testRequestCheck() {
         try {
@@ -45,11 +50,27 @@ class RequestsTest {
     }
 
     @Test fun testRequestGet() {
+
+        val start = Instant.now().toEpochMilli()
+
         try {
             request.getUrl(testUrl)
         } catch (e: ContentFetchError) {
             // Ignore this, it's expected
         }
+
+        try {
+            request.getUrl(testUrl2)
+        } catch (e: ContentFetchError) {
+            // Ignore this, it's expected
+        }
+
+        val end = Instant.now().toEpochMilli()
+
+        // Make sure that the politeness delay is respected
+        assertTrue {end - start > config.politenessDelay}
+
+        // and that the httpClient was called
         verify(mockHttpClient, times(2)).execute(any())
     }
 }

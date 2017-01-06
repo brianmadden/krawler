@@ -18,6 +18,7 @@
 
 package io.thelandscape.krawler.http
 
+import io.thelandscape.krawler.crawler.KrawlConfig
 import org.apache.http.HttpResponse
 import org.apache.http.client.config.CookieSpecs
 import org.apache.http.client.config.RequestConfig
@@ -27,7 +28,8 @@ import org.apache.http.client.methods.HttpUriRequest
 import org.apache.http.impl.client.CloseableHttpClient
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
-import org.apache.http.impl.cookie.IgnoreSpec
+import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
 
 interface RequestProviderIf {
     /**
@@ -41,7 +43,6 @@ interface RequestProviderIf {
     fun getUrl(url: KrawlUrl): RequestResponse
 }
 
-val Request: Requests = Requests()
 private val pcm: PoolingHttpClientConnectionManager = PoolingHttpClientConnectionManager()
 private val requestConfig = RequestConfig.custom()
         .setCookieSpec(CookieSpecs.STANDARD)
@@ -52,7 +53,8 @@ private val requestConfig = RequestConfig.custom()
 
 // TODO: Clean up the connection pool somewhere
 
-class Requests(val httpClient: CloseableHttpClient =
+class Requests(val krawlConfig: KrawlConfig,
+               val httpClient: CloseableHttpClient =
                HttpClients.custom()
                        .setDefaultRequestConfig(requestConfig)
                        .setConnectionManager(pcm).build()) : RequestProviderIf {
@@ -62,34 +64,47 @@ class Requests(val httpClient: CloseableHttpClient =
      *
      * @return RequestResponse: KrawlDocument containing the status code, or ErrorResponse on error
      */
-   override fun checkUrl(url: KrawlUrl): RequestResponse =
-            requestAndClose(url, ::HttpHead, ::KrawlDocument)
+   override fun checkUrl(url: KrawlUrl): RequestResponse = makeRequest(url, ::HttpHead, ::KrawlDocument)
 
     /** Get the contents of a URL
      * @param url KrawlUrl: the URL to get the contents of
      *
      * @return KrawlDocument: The parsed HttpResponse returned by the GET request
      */
-    override fun getUrl(url: KrawlUrl): RequestResponse =
-            requestAndClose(url, ::HttpGet, ::KrawlDocument)
+    override fun getUrl(url: KrawlUrl): RequestResponse = makeRequest(url, ::HttpGet, ::KrawlDocument)
 
-    /** Convenience function for building, issuing, and closing the HttpRequest
+    // Hash map to track requests and respect politeness
+    private val requestTracker: ConcurrentHashMap<String, Long> = ConcurrentHashMap()
+
+    /** Convenience function for building, & issuing the HttpRequest
      * @param url KrawlUrl: Url to make request to
      * @param reqFun: Function used to construct the request
      * @param retFun: Function used to construct the response object
      */
-    private fun requestAndClose(url: KrawlUrl,
-                                reqFun: (String) -> HttpUriRequest,
-                                retFun: (KrawlUrl, HttpResponse) -> RequestResponse): RequestResponse {
+    private fun makeRequest(url: KrawlUrl,
+                            reqFun: (String) -> HttpUriRequest,
+                            retFun: (KrawlUrl, HttpResponse) -> RequestResponse): RequestResponse {
 
         val req: HttpUriRequest = reqFun(url.canonicalForm)
+
+        // Handle politeness
+        if (krawlConfig.politenessDelay > 0) {
+            val lastRequest = requestTracker.getOrDefault(url.host, 0L)
+            val reqDelta = Instant.now().toEpochMilli() - lastRequest
+            if (reqDelta >= 0 && reqDelta < krawlConfig.politenessDelay)
+                // Sleep until the remainder of the politeness delay has elapsed
+                Thread.sleep(krawlConfig.politenessDelay - reqDelta)
+        }
+
         val resp: RequestResponse = try {
             val response: HttpResponse? = httpClient.execute(req)
             if (response == null) ErrorResponse(url) else retFun(url, response)
         } catch (e: Exception) {
             throw ContentFetchError(url, e)
+        } finally {
+            // Set last request time for politeness
+            requestTracker[url.host] = Instant.now().toEpochMilli()
         }
-
         return resp
     }
 }

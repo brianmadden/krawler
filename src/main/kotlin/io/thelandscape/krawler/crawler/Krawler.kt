@@ -43,7 +43,7 @@ import kotlin.concurrent.write
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                        private val queue: KrawlQueueIf = KrawlQueueDao,
                        private val krawlHistory: KrawlHistoryIf = KrawlHistory,
-                       private val requestProvider: RequestProviderIf = Request,
+                       private val requestProvider: RequestProviderIf = Requests(config),
                        private val threadpool: ExecutorService = Executors.newFixedThreadPool(config.numThreads)) {
 
     /**
