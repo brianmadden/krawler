@@ -217,19 +217,12 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             field = value
         }
 
-    // Lock to enforce politeness
-    private val politeLock: ReentrantLock = ReentrantLock()
-    // Extension function to make pop polite
-    private fun KrawlQueueIf.politePop(): QueueEntry? =
-            politeLock.withPoliteLock(0) { queue.pop() }
-            // politeLock.withPoliteLock(config.politenessDelay) { queue.pop() }
-
     internal fun doCrawl() {
         var emptyQueueWaitCount: Int = 0
 
         while(continueCrawling) {
             // Pop a URL off the queue
-            var qe: QueueEntry? = queue.politePop()
+            var qe: QueueEntry? = queue.pop()
             if (qe == null) {
 
                 // Wait for the configured period for more URLs
@@ -238,7 +231,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                     emptyQueueWaitCount++
 
                     // Try to pop again
-                    qe = queue.politePop()
+                    qe = queue.pop()
 
                     // If we have something, reset the count and move on
                     if (qe != null) {
