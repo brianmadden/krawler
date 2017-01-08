@@ -24,10 +24,8 @@ import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueDao
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
 import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
-import io.thelandscape.krawler.crawler.util.withPoliteLock
 import io.thelandscape.krawler.http.*
 import java.util.concurrent.*
-import java.util.concurrent.locks.ReentrantLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.thread
@@ -261,7 +259,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                         continue
                     } else { // If it
                         krawlHistory.insert(krawlUrl)
-            }
+                    }
 
             // If we're supposed to visit this, get the HTML and call visit
             if (shouldVisit(krawlUrl)) {

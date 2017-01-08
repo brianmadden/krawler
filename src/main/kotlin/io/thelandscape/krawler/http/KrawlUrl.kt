@@ -90,6 +90,7 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
         // This will handle the normalization process in-line to prevent excessive string mutations
         var idx: Int = 0
         var hostStart: Int = 0
+        var nonHostSlashSeen: Boolean = false
         var hostFound: Boolean = false
 
         // Used for decoding encoded characters
@@ -104,56 +105,65 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
             val c = url[idx]
 
             // Handle isAbsolute and finding the scheme
-            if (!firstColonFound && c == ':') {
-                firstColonFound = true
+            if (c == ':') {
+                if (!firstColonFound) {
+                    firstColonFound = true
 
-                // If the first colon was found the scheme is everything up until then
-                // NORMALIZE: Scheme should all be lowercase
-                val validator: Regex = Regex("[A-Za-z][\\w+-.]*")
-                val slice = url.slice(0 until idx).toLowerCase()
-                scheme = if(validator.matches(slice)) slice else scheme
+                    // If the first colon was found the scheme is everything up until then
+                    // NORMALIZE: Scheme should all be lowercase
+                    val validator: Regex = Regex("[A-Za-z][\\w+-.]*")
+                    val slice = url.slice(0 until idx).toLowerCase()
+                    // NOTE: Right now we're ignoring any scheme that isn't http or https since we're only crawling
+                    // websites. This isn't *technically* correct, but neither are a lot of URLs we find :-/
+                    scheme = if (validator.matches(slice) && (slice == "http" || slice == "https")) slice else scheme
 
-                if (url.getOrNull(idx + 1) == '/' && url.getOrNull(idx + 2) == '/') {
-                    isAbsolute = true
-                    // Move idx by 3 to the start of the host portion
-                    idx += 3
-                    // Start the host after the scheme
-                    hostStart = idx
+                    if (url.getOrNull(idx + 1) == '/' && url.getOrNull(idx + 2) == '/') {
+                        isAbsolute = true
+                        // Move idx by 3 to the start of the host portion
+                        idx += 3
+                        // Start the host after the scheme
+                        hostStart = idx
+                        continue
+                    }
+                }
+
+                // Find the port if it's present
+                if (!nonHostSlashSeen && !hostFound && firstColonFound) {
+                    // This should be the port
+                    var portIdxAdder = 1
+                    // Get all of the digits after the colon
+                    while (url.getOrElse(idx + portIdxAdder, { ' ' }).isDigit()) {
+                        portIdxAdder++
+                    }
+
+                    val slice = url.slice(idx + 1 until idx + portIdxAdder)
+                    port = if (slice.isNotBlank()) slice.toInt() else port
+
+                    // Increment the index and move on
+                    idx += portIdxAdder
                     continue
                 }
             }
 
-            // Find the port if it's present
-            if (firstColonFound && c == ':') {
-                // This should be the port
-                var portIdxAdder = 1
-                // Get all of the digits after the colon
-                while (url.getOrElse(idx + portIdxAdder, { ' ' }).isDigit()) {
-                    portIdxAdder++
-                }
-
-                val slice = url.slice(idx + 1 until idx + portIdxAdder)
-                port = if (slice.isNotBlank()) slice.toInt() else port
-
-                // Increment the index and move on
-                idx += portIdxAdder
-                continue
-            }
-
             // Everything up until the port is the host portion
-            if (isAbsolute && c == '/') {
-                // NORMALIZATION: convert to lowercase for normalization
-                // NORMALIZATION: Remove the port if the scheme is http
-                host = url.slice(hostStart until idx)
-                        .toLowerCase()
-                        .replace(Regex(":[0-9]+"), "")
+            if (c == '/') {
+                if (isAbsolute)
+                    nonHostSlashSeen = true
 
-                hostFound = true
+                if (isAbsolute) {
+                    // NORMALIZATION: convert to lowercase for normalization
+                    // NORMALIZATION: Remove the port if the scheme is http
+                    host = url.slice(hostStart until idx)
+                            .toLowerCase()
+                            .replace(Regex(":[0-9]+"), "")
 
-                path = url.slice(idx until url.length)
+                    hostFound = true
 
-                // If we've come this far we're ready to process the path
-                break
+                    path = url.slice(idx until url.length)
+
+                    // If we've come this far we're ready to process the path
+                    break
+                }
             }
 
             // Increment idx if we didn't do any special handling

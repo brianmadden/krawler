@@ -25,12 +25,12 @@ fun main(args: Array<String>) {
 
     val logger: Logger = LogManager.getLogger("krawlerExample")
 
-    val config: KrawlConfig = KrawlConfig(totalPages = 100, numThreads = 1)
+    val config: KrawlConfig = KrawlConfig(totalPages = 10, numThreads = 1)
     val k = ExampleKrawler(config)
 
     val start: LocalTime = LocalTime.now()
     k.start("http://en.wikipedia.org")
     val end: LocalTime = LocalTime.now()
-    print("Total: ${end.toSecondOfDay() - start.toSecondOfDay()} seconds...")
+    print("Total: ${(end.toNanoOfDay() - start.toNanoOfDay()) / 1000000000.0} seconds...")
 
 }

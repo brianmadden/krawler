@@ -34,7 +34,29 @@ class KrawlUrlTest {
     val testUrl = KrawlUrl.new(rawUrl)
     val anchorTestUrl = KrawlUrl.new(doc)
 
+    // Ensure that we don't accidentally double slash
+    // Also ensure that a colon in a relative URL doesn't get identified as
+    // a scheme if the relative URL doesn't start with a slash
+    @Test fun testParentHostDoesntCauseDoubleSlashes() {
+        val parent = KrawlUrl.new("http://www.example.org/")
+        val url = KrawlUrl.new("foo:bar:bas", parent)
+        assertEquals("http://www.example.org/foo:bar:bas", url.canonicalForm)
+    }
+
     @Test fun testPort() = assertEquals(testUrl.port, 80)
+
+    @Test fun testRelativeUrlWithTwoColons() {
+        val url = KrawlUrl.new("/wiki/foo:bar:bas")
+        assertEquals("http", url.scheme)
+        assertEquals("/wiki/foo:bar:bas", url.path)
+    }
+
+    @Test fun testAbsoluteWithTwoColonsAndNoPort() {
+        val url = KrawlUrl.new("http://www.example.org/foo:bar:bas")
+        assertEquals("http", url.scheme)
+        assertEquals(80, url.port)
+        assertEquals("/foo:bar:bas", url.path)
+    }
 
     @Test fun testUrlWithNoPath() {
         val noPath = KrawlUrl.new("http://www.example.org")

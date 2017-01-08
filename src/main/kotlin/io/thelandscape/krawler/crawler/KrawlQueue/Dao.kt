@@ -75,19 +75,19 @@ class KrawlQueueHSQLDao(session: Session,
         return pop(1).fetch(Node.all).firstOrNull()
     }
 
+    private val syncLock = Any()
     private fun pop(n: Int): List<QueueEntry> {
 
         val selectSql = "SELECT TOP :n $columns FROM ${table.name}"
         val params = mapOf("n" to n)
-
         var out: List<QueueEntry> = listOf()
-        session.transaction {
+        // Synchronize this to prevent race conditions between popping and deleting
+        synchronized(syncLock) {
             out = session.select(selectSql, params, mapper = table.rowMapper())
             if (out.isNotEmpty())
                 session.update("DELETE FROM ${table.name} WHERE url IN (:ids)",
-                        mapOf("ids" to out.map{ it.url }.joinToString(",")))
+                        mapOf("ids" to out.map { it.url }.joinToString(",")))
         }
-
         return out
     }
 
