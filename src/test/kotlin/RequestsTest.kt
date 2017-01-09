@@ -28,6 +28,10 @@ import org.apache.http.impl.client.CloseableHttpClient
 import org.junit.Before
 import org.junit.Test
 import java.time.Instant
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import kotlin.concurrent.thread
 import kotlin.test.assertTrue
 
 class RequestsTest {
@@ -52,25 +56,25 @@ class RequestsTest {
     @Test fun testRequestGet() {
 
         val start = Instant.now().toEpochMilli()
-
-        try {
-            request.getUrl(testUrl)
-        } catch (e: ContentFetchError) {
-            // Ignore this, it's expected
+        val threadpool: ExecutorService = Executors.newFixedThreadPool(4)
+        val numTimes = 5
+        (1 .. numTimes).forEach {
+            try {
+                request.getUrl(testUrl)
+            } catch (e: ContentFetchError) {
+                // Ignore this, it's expected
+            }
         }
-
-        try {
-            request.getUrl(testUrl2)
-        } catch (e: ContentFetchError) {
-            // Ignore this, it's expected
-        }
+        threadpool.shutdown()
+        while(!threadpool.isTerminated) {}
 
         val end = Instant.now().toEpochMilli()
 
         // Make sure that the politeness delay is respected
-        assertTrue {end - start > config.politenessDelay}
+        // This delay should take politeness delay * (n - 1) requests (first doesn't wait)
+        assertTrue {end - start > config.politenessDelay * (numTimes - 1)}
 
         // and that the httpClient was called
-        verify(mockHttpClient, times(2)).execute(any())
+        verify(mockHttpClient, times(5)).execute(any())
     }
 }
