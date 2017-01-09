@@ -207,12 +207,12 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     var visitCount: Int = 0
         get() = visitCountLock.read { field }
         private set(value) = visitCountLock.write {
+            field = value
+
             // If we're setting the visit count to the configured number of
             // pages to crawl, flip the switch to stop crawling
             if (value == config.totalPages)
                 continueCrawling = false
-
-            field = value
         }
 
     internal fun doCrawl() {
@@ -263,7 +263,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             // If we're supposed to visit this, get the HTML and call visit
             if (shouldVisit(krawlUrl)) {
-                visitCount += 1
+                visitCount += 1 // This will also set continueCrawling to false if the totalPages has been hit
 
                 val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
 
