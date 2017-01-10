@@ -29,6 +29,7 @@ import org.apache.http.impl.client.CloseableHttpClient
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import java.time.Instant
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 interface RequestProviderIf {
@@ -74,8 +75,9 @@ class Requests(val krawlConfig: KrawlConfig,
     override fun getUrl(url: KrawlUrl): RequestResponse = makeRequest(url, ::HttpGet, ::KrawlDocument)
 
     // Hash map to track requests and respect politeness
-    private val requestTracker: MutableMap<String, Long> = mutableMapOf()
-    private val requestLock = Any()
+    // TODO: Make politeness delay a per-domain or per-host thing, or is the politeness for ourselves? ;)
+    private var lastRequest: Long = 0
+    private val requestMutex = Any()
 
     /** Convenience function for building, & issuing the HttpRequest
      * @param url KrawlUrl: Url to make request to
@@ -88,28 +90,26 @@ class Requests(val krawlConfig: KrawlConfig,
 
         val req: HttpUriRequest = reqFun(url.canonicalForm)
 
-        synchronized(requestLock) {
-            // Handle politeness
-            if (krawlConfig.politenessDelay > 0) {
-                val lastRequest = requestTracker.getOrElse(url.host, { 0L })
+        // Handle politeness
+        if (krawlConfig.politenessDelay > 0) {
+            synchronized(requestMutex) {
                 val reqDelta = Instant.now().toEpochMilli() - lastRequest
                 if (reqDelta >= 0 && reqDelta < krawlConfig.politenessDelay)
                 // Sleep until the remainder of the politeness delay has elapsed
                     Thread.sleep(krawlConfig.politenessDelay - reqDelta)
-            }
-
-            val resp: RequestResponse = try {
-                val response: HttpResponse? = httpClient.execute(req)
-                if (response == null) ErrorResponse(url) else retFun(url, response)
-            } catch (e: Exception) {
-                throw ContentFetchError(url, e)
-            } finally {
                 // Set last request time for politeness
-                requestTracker[url.host] = Instant.now().toEpochMilli()
+                lastRequest = Instant.now().toEpochMilli()
             }
-
-            return resp
         }
+
+        val resp: RequestResponse = try {
+            val response: HttpResponse? = httpClient.execute(req)
+            if (response == null) ErrorResponse(url) else retFun(url, response)
+        } catch (e: Exception) {
+            throw ContentFetchError(url, e)
+        }
+
+        return resp
     }
 }
 

@@ -25,7 +25,7 @@ fun main(args: Array<String>) {
 
     val logger: Logger = LogManager.getLogger("krawlerExample")
 
-    val config: KrawlConfig = KrawlConfig(totalPages = 100, numThreads = 1)
+    val config: KrawlConfig = KrawlConfig(totalPages = 100, numThreads = 4)
     val k = ExampleKrawler(config)
 
     val start: LocalTime = LocalTime.now()

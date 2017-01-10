@@ -53,7 +53,7 @@ class RequestsTest {
 
         val start = Instant.now().toEpochMilli()
         val threadpool: ExecutorService = Executors.newFixedThreadPool(4)
-        val numTimes = 5
+        val numTimes = 10
         (1 .. numTimes).forEach {
             try {
                 request.getUrl(testUrl)
@@ -71,6 +71,6 @@ class RequestsTest {
         assertTrue {end - start > config.politenessDelay * (numTimes - 1)}
 
         // and that the httpClient was called
-        verify(mockHttpClient, times(5)).execute(any())
+        verify(mockHttpClient, times(numTimes)).execute(any())
     }
 }
