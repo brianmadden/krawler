@@ -25,13 +25,10 @@ import io.thelandscape.krawler.http.ContentFetchError
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.Requests
 import org.apache.http.impl.client.CloseableHttpClient
-import org.junit.Before
 import org.junit.Test
 import java.time.Instant
-import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import kotlin.concurrent.thread
 import kotlin.test.assertTrue
 
 class RequestsTest {
@@ -40,7 +37,6 @@ class RequestsTest {
     val config: KrawlConfig = KrawlConfig()
     val request: Requests = Requests(config, mockHttpClient)
     val testUrl = KrawlUrl.new("http://httpbin.org")
-    val testUrl2 = KrawlUrl.new("http://httpbin.org/get")
 
     @Test fun testRequestCheck() {
         try {

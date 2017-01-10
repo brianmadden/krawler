@@ -74,7 +74,9 @@ class Requests(val krawlConfig: KrawlConfig,
     override fun getUrl(url: KrawlUrl): RequestResponse = makeRequest(url, ::HttpGet, ::KrawlDocument)
 
     // Hash map to track requests and respect politeness
-    private val requestTracker: ConcurrentHashMap<String, Long> = ConcurrentHashMap()
+    private val requestTracker: MutableMap<String, Long> = mutableMapOf()
+    private val requestLock = Any()
+    // private val requestTracker: ConcurrentHashMap<String, Long> = ConcurrentHashMap()
 
     /** Convenience function for building, & issuing the HttpRequest
      * @param url KrawlUrl: Url to make request to
@@ -88,12 +90,14 @@ class Requests(val krawlConfig: KrawlConfig,
         val req: HttpUriRequest = reqFun(url.canonicalForm)
 
         // Handle politeness
-        if (krawlConfig.politenessDelay > 0) {
-            val lastRequest = requestTracker.getOrDefault(url.host, 0L)
-            val reqDelta = Instant.now().toEpochMilli() - lastRequest
-            if (reqDelta >= 0 && reqDelta < krawlConfig.politenessDelay)
+        synchronized(requestLock) {
+            if (krawlConfig.politenessDelay > 0) {
+                val lastRequest = requestTracker.getOrElse(url.host, { 0L })
+                val reqDelta = Instant.now().toEpochMilli() - lastRequest
+                if (reqDelta >= 0 && reqDelta < krawlConfig.politenessDelay)
                 // Sleep until the remainder of the politeness delay has elapsed
-                Thread.sleep(krawlConfig.politenessDelay - reqDelta)
+                    Thread.sleep(krawlConfig.politenessDelay - reqDelta)
+            }
         }
 
         val resp: RequestResponse = try {
