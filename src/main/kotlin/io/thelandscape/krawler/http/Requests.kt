@@ -30,6 +30,9 @@ import org.apache.http.impl.client.HttpClients
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 
 interface RequestProviderIf {
     /**
@@ -75,8 +78,7 @@ class Requests(val krawlConfig: KrawlConfig,
 
     // Hash map to track requests and respect politeness
     private val requestTracker: MutableMap<String, Long> = mutableMapOf()
-    private val requestLock = Any()
-    // private val requestTracker: ConcurrentHashMap<String, Long> = ConcurrentHashMap()
+    private val politeLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
 
     /** Convenience function for building, & issuing the HttpRequest
      * @param url KrawlUrl: Url to make request to
@@ -90,14 +92,13 @@ class Requests(val krawlConfig: KrawlConfig,
         val req: HttpUriRequest = reqFun(url.canonicalForm)
 
         // Handle politeness
-        synchronized(requestLock) {
-            if (krawlConfig.politenessDelay > 0) {
-                val lastRequest = requestTracker.getOrElse(url.host, { 0L })
-                val reqDelta = Instant.now().toEpochMilli() - lastRequest
-                if (reqDelta >= 0 && reqDelta < krawlConfig.politenessDelay)
+
+        if (krawlConfig.politenessDelay > 0) {
+            val lastRequest = politeLock.read { requestTracker.getOrElse(url.host, { 0L }) }
+            val reqDelta = Instant.now().toEpochMilli() - lastRequest
+            if (reqDelta >= 0 && reqDelta < krawlConfig.politenessDelay)
                 // Sleep until the remainder of the politeness delay has elapsed
-                    Thread.sleep(krawlConfig.politenessDelay - reqDelta)
-            }
+                Thread.sleep(krawlConfig.politenessDelay - reqDelta)
         }
 
         val resp: RequestResponse = try {
@@ -107,7 +108,7 @@ class Requests(val krawlConfig: KrawlConfig,
             throw ContentFetchError(url, e)
         } finally {
             // Set last request time for politeness
-            requestTracker[url.host] = Instant.now().toEpochMilli()
+            politeLock.write { requestTracker[url.host] = Instant.now().toEpochMilli() }
         }
         return resp
     }
