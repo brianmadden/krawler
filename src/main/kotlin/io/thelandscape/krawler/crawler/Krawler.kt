@@ -154,7 +154,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
         onCrawlStart()
         entries.forEach { threadpool.submit { doCrawl(it) } }
-        while(!threadpool.isTerminated || threadpool.corePoolSize != 0) {}
+        while(!threadpool.isTerminated || threadpool.corePoolSize != 0) { Thread.sleep(500) }
         onCrawlEnd()
     }
 
