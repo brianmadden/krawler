@@ -28,10 +28,6 @@ import org.jsoup.select.Elements
 import java.io.ByteArrayInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 
-// Only need these once for all documents
-private val dbf = DocumentBuilderFactory.newInstance()
-private val db = dbf.newDocumentBuilder()
-
 interface RequestResponse
 
 data class ErrorResponse(val url: KrawlUrl) : RequestResponse

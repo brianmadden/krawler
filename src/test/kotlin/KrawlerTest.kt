@@ -26,9 +26,11 @@ import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestProviderIf
 import org.junit.Before
 import org.junit.Test
-import java.util.concurrent.*
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class KrawlerTest {
 
@@ -36,8 +38,9 @@ class KrawlerTest {
     val mockConfig = KrawlConfig(emptyQueueWaitTime = 1)
     val mockHistory = mock<KrawlHistoryIf>()
     val mockRequests = mock<RequestProviderIf>()
-    val mockThreadfactory = mock<ThreadFactory>()
-    val threadpool: ExecutorService = Executors.newCachedThreadPool(mockThreadfactory)
+    val mockThreadFactory = mock<ThreadFactory>()
+    val threadpool: ThreadPoolExecutor =
+            ThreadPoolExecutor(4, 4, 1000L, TimeUnit.MILLISECONDS, LinkedBlockingQueue<Runnable>(), mockThreadFactory)
     val mockThreadpool = mock<ThreadPoolExecutor>()
 
     val preparedResponse = KrawlDocument(exampleUrl, prepareResponse(200, ""))
@@ -45,7 +48,7 @@ class KrawlerTest {
     class testCrawler(x: KrawlConfig,
                       w: KrawlHistoryIf,
                       v: RequestProviderIf,
-                      z: ExecutorService): Krawler(x, w, v, z) {
+                      z: ThreadPoolExecutor): Krawler(x, w, v, z) {
         override fun shouldVisit(url: KrawlUrl): Boolean {
             return true
         }
@@ -85,16 +88,16 @@ class KrawlerTest {
      * Test that when stop is called we try to shutdown
      */
     @Test fun testStop() {
-        realThreadpoolTestKrawler.stop()
-        assertTrue { threadpool.isShutdown }
+        mockThreadpoolTestKrawler.stop()
+        verify(mockThreadpool).shutdown()
     }
 
     /**
      * Test that when shutdown is called we try to shutdownNow
      */
     @Test fun testShutdown() {
-        realThreadpoolTestKrawler.shutdown()
-        assertTrue { threadpool.isShutdown }
+        mockThreadpoolTestKrawler.shutdown()
+        verify(mockThreadpool, atLeastOnce()).shutdownNow()
     }
 
     /**

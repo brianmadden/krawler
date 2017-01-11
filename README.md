@@ -29,5 +29,5 @@ Roadmap
 Random TODO
 ===========
 1. If anchor tag specifies that URL is canonical use it as is
-1. Clean up the requests class to properly close the connection pool
-1. 
+0. Clean up the requests class to properly close the connection pool
+0. 

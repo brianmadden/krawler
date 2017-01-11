@@ -21,16 +21,23 @@ import io.thelandscape.krawler.crawler.Krawler
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
 
-class ExampleKrawler(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
+class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
+
+    private val pagesCrawled: MutableList<String> = mutableListOf()
+
+    private val FILTERS: Regex = Regex(".*(\\.(css|js|bmp|gif|jpe?g|png|tiff?|mid|mp2|mp3|mp4|wav|avi|" +
+            "mov|mpeg|ram|m4v|pdf|rm|smil|wmv|swf|wma|zip|rar|gz|tar|ico))$")
 
     override fun shouldVisit(url: KrawlUrl): Boolean {
-        return (url.host == "en.wikipedia.org")
+        val withoutGetParams: String = url.canonicalForm.split("?").first()
+
+        return (!FILTERS.matches(withoutGetParams) && url.host == "en.wikipedia.org")
     }
 
     override fun shouldCheck(url: KrawlUrl): Boolean = false
 
     override fun visit(url: KrawlUrl, doc: KrawlDocument) {
-        println("Visiting ${url.canonicalForm}")
+        pagesCrawled.add(url.canonicalForm)
     }
 
     override fun check(url: KrawlUrl, statusCode: Int) {
@@ -38,7 +45,8 @@ class ExampleKrawler(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
     }
 
     override fun onCrawlEnd() {
-        println("Crawled $visitCount pages.")
+        println("Crawled the following $visitCount pages:")
+        pagesCrawled.forEach(::println)
     }
 
 }
