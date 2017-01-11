@@ -28,6 +28,11 @@ import java.util.concurrent.Executors
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.ThreadPoolExecutor
+
+
 
 /**
  * Class defines the operations and data structures used to perform a web crawl.
@@ -39,7 +44,15 @@ import kotlin.concurrent.write
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                        private val krawlHistory: KrawlHistoryIf = KrawlHistory,
                        private val requestProvider: RequestProviderIf = Requests(config),
-                       private val threadpool: ExecutorService = Executors.newFixedThreadPool(config.numThreads)) {
+                       private val threadpool: ThreadPoolExecutor = ThreadPoolExecutor(config.numThreads,
+                               config.numThreads,
+                               config.emptyQueueWaitTime, TimeUnit.SECONDS,
+                               LinkedBlockingQueue<Runnable>())) {
+
+    init {
+        // Set the core threadpool threads to destroy themselves after config.emptyQueueWaitTime
+        threadpool.allowCoreThreadTimeOut(true)
+    }
 
     /**
      * Override this function to determine if a URL should be visited.
@@ -141,7 +154,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
         onCrawlStart()
         entries.forEach { threadpool.submit { doCrawl(it) } }
-        while(!threadpool.isTerminated) {}
+        while(!threadpool.isTerminated || threadpool.corePoolSize != 0) {}
         onCrawlEnd()
     }
 

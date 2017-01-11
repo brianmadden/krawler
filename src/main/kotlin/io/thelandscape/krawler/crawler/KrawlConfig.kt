@@ -41,9 +41,9 @@ class KrawlConfig(
         // Should the Krawl progress persist?
         val persistentKrawl: Boolean = false,
         // Length of time to sleep when queue becomes empty
-        emptyQueueWaitTime: Int = 10
+        emptyQueueWaitTime: Long = 10
 ) {
     // Length of time to sleep when queue becomes empty
-    var emptyQueueWaitTime: Int = emptyQueueWaitTime
+    var emptyQueueWaitTime: Long = emptyQueueWaitTime
         private set(value) { field = if (value <= 0) 1 else value }
 }
