@@ -23,15 +23,12 @@ import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
 import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
 import io.thelandscape.krawler.http.*
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.ThreadPoolExecutor
-
 
 
 /**
@@ -145,8 +142,26 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      */
     open var crawlContext: Any? = null
 
+    /**
+     * Starts the Krawler with the URL provided. This method will call `onCrawlStart()`
+     * perform the crawl and then call `onCrawlEnd()`. This method will block for the duration
+     * of the crawl.
+     *
+     * @param: seedUrl String: A single seed URL
+     *
+     * @return: [Unit]
+     */
     fun start(seedUrl: String) = start(listOf(seedUrl))
 
+    /**
+     * Starts the Krawler with the URLs provided. This method will call `onCrawlStart()`
+     * perform the crawl and then call `onCrawlEnd()`. This method will block for the duration
+     * of the crawl.
+     *
+     * @param: seedUrl List<String>: A list of seed URLs
+     *
+     * @return: [Unit]
+     */
     fun start(seedUrl: List<String>) {
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
@@ -158,39 +173,44 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         onCrawlEnd()
     }
 
-    /*fun startNonblocking(seedUrl: String) = startNonblocking(listOf(seedUrl))*/
+    /**
+     * Starts the Krawler with the URL provided. This method will call `onCrawlStart()`
+     * start the crawl and then return. This method will -NOT- block during the crawl.
+     * Note that because this method does not block, it will also not call `onCrawlEnd()`.
+     *
+     * @param: seedUrl String: A single seed URL
+     *
+     * @return: [Unit]
+     */
+    fun startNonblocking(seedUrl: String) = startNonblocking(listOf(seedUrl))
 
-    /*fun startNonblocking(seedUrl: List<String>) {
+    /**
+     * Starts the Krawler with the URLs provided. This method will call `onCrawlStart()`
+     * start the crawl and then return. This method will -NOT- block during the crawl.
+     * Note that because this method does not block, it will also not call `onCrawlEnd()`.
+     *
+     * @param: seedUrl List<String>: A list of seed URLs
+     *
+     * @return: [Unit]
+     */
+    fun startNonblocking(seedUrl: List<String>) {
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
+        val entries: List<QueueEntry> = krawlUrls.map { QueueEntry(it.canonicalForm) }
 
-        // Insert the seeds
-        queue.push(krawlUrls.map{ QueueEntry(it.canonicalForm) })
+        onCrawlStart()
+        entries.forEach { threadpool.submit { doCrawl(it) } }
+    }
 
-        // Nonblocking so do all the work in another thread
-        thread {
-            onCrawlStart()
-
-            val threads: List<Future<*>> = (1..config.numThreads).map { threadpool.submit{ doCrawl() } }
-            threads.forEach {
-                /*
-                try {
-                    it.get()
-                }
-                catch (e: InterruptedException) {}
-                catch(e: ExecutidonException) {}
-                catch(e: CancellationException) {}
-                */
-                it.get()
-            }
-
-            onCrawlEnd()
-        }
-
-    }*/
-
+    /**
+     * Attempts to stop Krawler by gracefully shutting down. All current threads will finish
+     * executing.
+     */
     fun stop() = threadpool.shutdown()
 
+    /**
+     * Attempts to stop Krawler by forcing a shutdown. Threads may be killed mid-execution.
+     */
     fun shutdown(): MutableList<Runnable> = threadpool.shutdownNow()
 
     /**
