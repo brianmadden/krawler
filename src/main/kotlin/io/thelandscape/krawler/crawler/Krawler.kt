@@ -69,7 +69,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      *
      * @return boolean: true if we should check, false otherwise
      */
-    abstract protected fun shouldCheck(url: KrawlUrl): Boolean
+    open protected fun shouldCheck(url: KrawlUrl): Boolean = false
 
     /**
      * Visit a URL by issuing an HTTP GET request
@@ -85,7 +85,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @param url KrawlURL: The requested URL
      * @param statusCode Int: The resulting status code from checking the URL
      */
-    abstract protected fun check(url: KrawlUrl, statusCode: Int)
+    open protected fun check(url: KrawlUrl, statusCode: Int) {
+        return
+    }
 
     /**
      * Function is called on unexpected status code (non 200).

@@ -34,19 +34,12 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
         return (!FILTERS.matches(withoutGetParams) && url.host == "en.wikipedia.org")
     }
 
-    override fun shouldCheck(url: KrawlUrl): Boolean = false
-
     override fun visit(url: KrawlUrl, doc: KrawlDocument) {
         pagesCrawled.add(url.canonicalForm)
-    }
-
-    override fun check(url: KrawlUrl, statusCode: Int) {
-        return
     }
 
     override fun onCrawlEnd() {
         println("Crawled the following $visitCount pages:")
         pagesCrawled.forEach(::println)
     }
-
 }
