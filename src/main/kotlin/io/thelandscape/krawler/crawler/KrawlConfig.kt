@@ -31,9 +31,6 @@ class KrawlConfig(
         // Politeness delay (in ms) to wait between requests
         // Default: 200ms
         val politenessDelay: Long = 200,
-        // Should binary content be visited?
-        // Default: false
-        val visitBinaryContent: Boolean = false,
         // User agent string
         val userAgent: String = "io.thelandscape.Krawler Web Crawler",
         // Directory where KrawlQueue will be persisted

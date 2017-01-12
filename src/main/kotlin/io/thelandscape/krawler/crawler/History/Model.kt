@@ -1,7 +1,3 @@
-package io.thelandscape.krawler.crawler.History
-
-import java.time.LocalDateTime
-
 /**
  * Created by brian.a.madden@gmail.com on 11/24/16.
  *
@@ -19,6 +15,10 @@ import java.time.LocalDateTime
  * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+
+package io.thelandscape.krawler.crawler.History
+
+import java.time.LocalDateTime
 
 data class KrawlHistoryEntry(val id: Long = -1,
                              val url: String = "",

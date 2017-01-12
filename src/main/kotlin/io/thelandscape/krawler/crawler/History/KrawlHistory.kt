@@ -18,7 +18,6 @@
 
 package io.thelandscape.krawler.crawler.History
 
-import io.thelandscape.krawler.hsqlSession
 import io.thelandscape.krawler.http.KrawlUrl
 import java.time.LocalDateTime
 
@@ -51,6 +50,3 @@ interface KrawlHistoryIf {
      */
     fun clearHistory(beforeTime: LocalDateTime = LocalDateTime.now()): Int
 }
-
-// Instantiate the KrawlFrontier with the default DAO
-internal val KrawlHistory = KrawlHistoryHSQLDao(hsqlSession)

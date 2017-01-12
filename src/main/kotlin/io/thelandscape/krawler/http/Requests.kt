@@ -29,7 +29,6 @@ import org.apache.http.impl.client.CloseableHttpClient
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import java.time.Instant
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
@@ -54,12 +53,11 @@ private val requestConfig = RequestConfig.custom()
         .setRedirectsEnabled(true)
         .build()
 
-// TODO: Clean up the connection pool somewhere
-
-class Requests(val krawlConfig: KrawlConfig,
-               val httpClient: CloseableHttpClient =
+class Requests(private val krawlConfig: KrawlConfig,
+               private val httpClient: CloseableHttpClient =
                HttpClients.custom()
                        .setDefaultRequestConfig(requestConfig)
+                       .setUserAgent(krawlConfig.userAgent)
                        .setConnectionManager(pcm).build()) : RequestProviderIf {
 
     /** Check a URL and return it's status code

@@ -23,8 +23,6 @@ import com.github.andrewoma.kwery.mapper.*
 import com.github.andrewoma.kwery.mapper.util.camelToLowerUnderscore
 import io.thelandscape.krawler.http.KrawlUrl
 import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.ZoneOffset
 
 object krawlHistoryTable : Table<KrawlHistoryEntry, Long>("KrawlHistory",
         TableConfiguration(standardDefaults + timeDefaults,

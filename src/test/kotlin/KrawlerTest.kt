@@ -19,7 +19,7 @@
 import com.nhaarman.mockito_kotlin.*
 import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
 import io.thelandscape.krawler.crawler.KrawlConfig
-import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
+import io.thelandscape.krawler.crawler.KrawlQueueEntry
 import io.thelandscape.krawler.crawler.Krawler
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
@@ -111,7 +111,7 @@ class KrawlerTest {
         whenever(mockRequests.getUrl(any())).thenReturn(preparedResponse)
 
         // Insert some stuff into the queue
-        realThreadpoolTestKrawler.doCrawl(QueueEntry("http://www.test.com"))
+        realThreadpoolTestKrawler.doCrawl(KrawlQueueEntry("http://www.test.com"))
 
         // Ensure we've called to verify this is a unique URL
         verify(mockHistory).hasBeenSeen(any())

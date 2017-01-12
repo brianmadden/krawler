@@ -18,10 +18,10 @@
 
 package io.thelandscape.krawler.crawler
 
-import io.thelandscape.krawler.crawler.History.KrawlHistory
+import io.thelandscape.krawler.HSQLConnection
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
+import io.thelandscape.krawler.crawler.History.KrawlHistoryHSQLDao
 import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
-import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
 import io.thelandscape.krawler.http.*
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
@@ -39,7 +39,8 @@ import kotlin.concurrent.write
  *
  */
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
-                       private val krawlHistory: KrawlHistoryIf = KrawlHistory,
+                       private val krawlHistory: KrawlHistoryIf =
+                       KrawlHistoryHSQLDao(HSQLConnection(config.persistentKrawl, config.crawlDirectory).hsqlSession!!),
                        private val requestProvider: RequestProviderIf = Requests(config),
                        private val threadpool: ThreadPoolExecutor = ThreadPoolExecutor(config.numThreads,
                                config.numThreads,
@@ -150,8 +151,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * of the crawl.
      *
      * @param: seedUrl String: A single seed URL
-     *
-     * @return: [Unit]
      */
     fun start(seedUrl: String) = start(listOf(seedUrl))
 
@@ -162,12 +161,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      *
      * @param: seedUrl List<String>: A list of seed URLs
      *
-     * @return: [Unit]
      */
     fun start(seedUrl: List<String>) {
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
-        val entries: List<QueueEntry> = krawlUrls.map { QueueEntry(it.canonicalForm) }
+        val entries: List<KrawlQueueEntry> = krawlUrls.map { KrawlQueueEntry(it.canonicalForm) }
 
         onCrawlStart()
         entries.forEach { threadpool.submit { doCrawl(it) } }
@@ -181,8 +179,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * Note that because this method does not block, it will also not call `onCrawlEnd()`.
      *
      * @param: seedUrl String: A single seed URL
-     *
-     * @return: [Unit]
      */
     fun startNonblocking(seedUrl: String) = startNonblocking(listOf(seedUrl))
 
@@ -192,13 +188,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * Note that because this method does not block, it will also not call `onCrawlEnd()`.
      *
      * @param: seedUrl List<String>: A list of seed URLs
-     *
-     * @return: [Unit]
      */
     fun startNonblocking(seedUrl: List<String>) {
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
-        val entries: List<QueueEntry> = krawlUrls.map { QueueEntry(it.canonicalForm) }
+        val entries: List<KrawlQueueEntry> = krawlUrls.map { KrawlQueueEntry(it.canonicalForm) }
 
         onCrawlStart()
         entries.forEach { threadpool.submit { doCrawl(it) } }
@@ -240,7 +234,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             }
         }
 
-    internal fun doCrawl(entry: QueueEntry) {
+    internal fun doCrawl(entry: KrawlQueueEntry) {
         // If we're done, we're done
         if(!continueCrawling) return
 
@@ -275,12 +269,12 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             }
 
             // Parse out the URLs and construct queue entries from them
-            val links: List<QueueEntry> = doc.anchorTags
+            val links: List<KrawlQueueEntry> = doc.anchorTags
                     .filterNot { it.attr("href").startsWith("#") }
                     .map { KrawlUrl.new(it, krawlUrl) }
                     .filterNotNull()
                     .filter { it.canonicalForm.isNotBlank() }
-                    .map { QueueEntry(it.canonicalForm, history, depth + 1) }
+                    .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1) }
 
             // Insert the URLs to the queue now
             links.forEach { threadpool.submit { doCrawl(it) } }

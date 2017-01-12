@@ -21,15 +21,17 @@ package io.thelandscape.krawler
 import com.github.andrewoma.kwery.core.ThreadLocalSession
 import com.github.andrewoma.kwery.core.dialect.HsqlDialect
 import com.github.andrewoma.kwery.core.interceptor.LoggingInterceptor
+import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import java.time.LocalDateTime
-import com.zaxxer.hikari.HikariConfig
 
 
-
-private class HSQLConnection(fileBacked: Boolean, fileName: String = ".krawl_tmp") {
+internal class HSQLConnection(fileBacked: Boolean, fileName: String = ".krawl_tmp") {
 
     var ds: HikariDataSource = HikariDataSource()
+        private set
+
+    var hsqlSession: ThreadLocalSession? = null
         private set
 
     init {
@@ -47,10 +49,6 @@ private class HSQLConnection(fileBacked: Boolean, fileName: String = ".krawl_tmp
         config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048")
 
         ds = HikariDataSource(config)
+        hsqlSession = ThreadLocalSession(ds, HsqlDialect(), LoggingInterceptor())
     }
 }
-
-
-
-private val connection = HSQLConnection(false).ds
-internal val hsqlSession: ThreadLocalSession = ThreadLocalSession(connection, HsqlDialect(), LoggingInterceptor())
