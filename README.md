@@ -26,6 +26,21 @@ still available to facilitate validation and checking though.
 * Krawler currently has no proxy support, but it is on the roadmap. :(
 * Krawler does not respect robots.txt so should be used with care. Be respectful! This feature is on the roadmap.
 
+Gradle
+======
+Krawler is published through jitpack.io. Add the following to your `build.gradle` to get use Krawler:
+
+```groovy
+ repositories {
+        jcenter()
+        maven { url "https://jitpack.io" }
+   }
+   dependencies {
+         compile 'com.github.jitpack:krawler:0.1.0'
+   }
+
+```
+
 Usage
 =====
 Using the Krawler framework is fairly simple. Minimally, there are two methods that must be overridden
