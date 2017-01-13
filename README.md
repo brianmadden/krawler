@@ -49,11 +49,11 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
     }
 
     override fun visit(url: KrawlUrl, doc: KrawlDocument) {
-        pagesCrawled.add(url.canonicalForm)
+        println("${this.visitCount}. Crawling ${url.canonicalForm}")
     }
 
     override fun onCrawlEnd() {
-        println("Crawled the following $visitCount pages:")
+        println("Crawled $visitCount pages.")
         pagesCrawled.forEach(::println)
     }
 }
@@ -63,10 +63,3 @@ Roadmap
 =======
 * Add support for collecting and respecting robots.txt
 * Proxy support
-
-Random TODO
-===========
-
-1. If anchor tag specifies that URL is canonical use it as is
-0. Clean up the requests class to properly close the connection pool
-0. Add option to prevent following redirects
