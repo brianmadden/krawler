@@ -1,3 +1,6 @@
+[![Release](https://jitpack.io/v/User/Repo.svg)]
+(https://jitpack.io/#brianmadden/krawler)
+
 About
 =====
 
@@ -28,7 +31,7 @@ still available to facilitate validation and checking though.
 
 Gradle
 ======
-Krawler is published through jitpack.io. Add the following to your `build.gradle` to get use Krawler:
+Krawler is published through jitpack.io at: https://jitpack.io/#brianmadden/krawler/ . Add the following to your `build.gradle` to get use Krawler:
 
 ```groovy
  repositories {
@@ -36,7 +39,7 @@ Krawler is published through jitpack.io. Add the following to your `build.gradle
         maven { url "https://jitpack.io" }
    }
    dependencies {
-         compile 'com.github.jitpack:krawler:0.1.0'
+         compile 'com.github.brianmadden:krawler:v0.1.0-beta.1'
    }
 
 ```
