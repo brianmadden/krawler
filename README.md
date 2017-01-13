@@ -24,6 +24,7 @@ poorly written websites, and thus less likely to error out during a crawl. The o
 still available to facilitate validation and checking though.
 * Krawler collects full anchor tags including all attributes and anchor text.
 * Krawler currently has no proxy support, but it is on the roadmap. :(
+* Krawler does not respect robots.txt so should be used with care. Be respectful! This feature is on the roadmap.
 
 Usage
 =====
