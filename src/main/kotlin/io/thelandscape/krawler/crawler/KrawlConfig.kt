@@ -36,7 +36,7 @@ class KrawlConfig(
         // Directory where KrawlQueue will be persisted
         val crawlDirectory: String = ".krawl",
         // Should the Krawl progress persist?
-        val persistentKrawl: Boolean = false,
+        val persistentCrawl: Boolean = false,
         // Maximum number of queued URLs
         val maximumQueueSize: Int = 50000,
         // Length of time to sleep when queue becomes empty

@@ -54,7 +54,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
     init {
         if (krawlHistory == null || krawlQueue == null) {
-            val hsqlConnection: HSQLConnection = HSQLConnection(config.persistentKrawl, config.crawlDirectory)
+            val hsqlConnection: HSQLConnection = HSQLConnection(config.persistentCrawl, config.crawlDirectory)
 
             if (krawlHistory == null)
                 krawlHistory = KrawlHistoryHSQLDao(hsqlConnection.hsqlSession)
@@ -243,7 +243,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
     // Global visit count and domain visit count
     private val visitCountLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
-
     var visitCount: Int = 0
         get() = visitCountLock.read { field }
         private set(value) = visitCountLock.write {
@@ -257,13 +256,13 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             }
         }
 
-    internal fun doCrawl() {
+    internal fun doCrawl(entry: KrawlQueueEntry? = krawlQueue!!.pop()) {
         // If we're done, we're done
         if(!continueCrawling) return
 
         var emptyQueueWaitCount: Long = 0
         // Pop a URL off the queue
-        var entry: KrawlQueueEntry? = krawlQueue!!.pop()
+        var entry: KrawlQueueEntry? = entry
         if (entry == null) {
 
             // Wait for the configured period for more URLs
@@ -324,7 +323,14 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                     .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1) }
 
             // Insert the URLs to the queue now
-            krawlQueue!!.push(links)
+            if (config.persistentCrawl) {
+                // Only in the persistent crawl case do we actually want to use the KrawlQueue
+                krawlQueue!!.push(links)
+                links.forEach { threadpool.submit { doCrawl() } }
+            } else {
+                // Skipping the HSQL backed queue saves us some time
+                links.forEach { threadpool.submit { doCrawl(it) } }
+            }
 
             // Finally call visit
             visit(krawlUrl, doc)
@@ -346,8 +352,5 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             check(krawlUrl, code)
         }
-
-        // Schedule the next page
-        threadpool.submit { doCrawl() }
     }
 }
