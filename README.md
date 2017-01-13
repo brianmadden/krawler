@@ -63,10 +63,3 @@ Roadmap
 =======
 * Add support for collecting and respecting robots.txt
 * Proxy support
-
-Random TODO
-===========
-
-1. If anchor tag specifies that URL is canonical use it as is
-0. Clean up the requests class to properly close the connection pool
-0. Add option to prevent following redirects
