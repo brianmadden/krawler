@@ -1,4 +1,4 @@
-[![Release](https://jitpack.io/v/User/Repo.svg)]
+[![Release](https://jitpack.io/v/brianmadden/krawler.svg)]
 (https://jitpack.io/#brianmadden/krawler)
 
 About
