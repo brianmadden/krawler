@@ -1,7 +1,7 @@
 About
 =====
 
-Krawler is a web crawler written in Kotlin. It is heavily inspired by the
+Krawler is a web crawling framework written in Kotlin. It is heavily inspired by the
 crawler4j (https://github.com/yasserg/crawler4j) by Yasser Ganjisaffar. Krawler
 is maintained by Brian A. Madden in conjunction with [TheLandscape](http://www.thelandscape.io), and was
 created to meet the specific needs of TheLandscape while also honing our Kotlin skills.
