@@ -37,14 +37,11 @@ The full code for this simple example can also be found in the [example project]
 ```kotlin
 class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
-    private val pagesCrawled: MutableList<String> = mutableListOf()
-
     private val FILTERS: Regex = Regex(".*(\\.(css|js|bmp|gif|jpe?g|png|tiff?|mid|mp2|mp3|mp4|wav|avi|" +
             "mov|mpeg|ram|m4v|pdf|rm|smil|wmv|swf|wma|zip|rar|gz|tar|ico))$")
 
     override fun shouldVisit(url: KrawlUrl): Boolean {
         val withoutGetParams: String = url.canonicalForm.split("?").first()
-
         return (!FILTERS.matches(withoutGetParams) && url.host == "en.wikipedia.org")
     }
 
@@ -54,7 +51,6 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
     override fun onCrawlEnd() {
         println("Crawled $visitCount pages.")
-        pagesCrawled.forEach(::println)
     }
 }
 ```

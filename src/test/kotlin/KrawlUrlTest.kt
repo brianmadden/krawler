@@ -34,6 +34,14 @@ class KrawlUrlTest {
     val testUrl = KrawlUrl.new(rawUrl)
     val anchorTestUrl = KrawlUrl.new(doc)
 
+    // Test the case where scheme is to be inferred from the parent by starting the URL with //
+    @Test fun testInferScheme() {
+        val httpsUrl = KrawlUrl.new("https://somesafesite.com")
+        val url = KrawlUrl.new("//something.org", httpsUrl)
+        assertEquals("https", url.scheme)
+
+    }
+
     // Ensure that we don't accidentally double slash
     // Also ensure that a colon in a relative URL doesn't get identified as
     // a scheme if the relative URL doesn't start with a slash

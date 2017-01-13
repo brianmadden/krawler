@@ -1,9 +1,3 @@
-package io.thelandscape.krawler.http
-
-import com.google.common.net.InternetDomainName
-import org.jsoup.nodes.Element
-
-
 /**
  * Created by @brianmadden on 10/21/16.
  *
@@ -21,6 +15,11 @@ import org.jsoup.nodes.Element
  * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+
+package io.thelandscape.krawler.http
+
+import com.google.common.net.InternetDomainName
+import org.jsoup.nodes.Element
 
 /**
  * Class to represent a URL that was either provided as a seed, or found during crawl.
@@ -147,10 +146,15 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
 
             // Everything up until the port is the host portion
             if (c == '/') {
-                if (isAbsolute)
-                    nonHostSlashSeen = true
+                // Handle the case where scheme is left out to be inferred from the parent
+                if (idx == 1 && url[0] == '/' && parent != null) {
+                    scheme = parent.scheme
+                    isAbsolute = true
+                }
 
                 if (isAbsolute) {
+                    nonHostSlashSeen = true
+
                     // NORMALIZATION: convert to lowercase for normalization
                     // NORMALIZATION: Remove the port if the scheme is http
                     host = url.slice(hostStart until idx)
