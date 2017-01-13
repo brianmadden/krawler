@@ -46,19 +46,28 @@ interface RequestProviderIf {
 }
 
 private val pcm: PoolingHttpClientConnectionManager = PoolingHttpClientConnectionManager()
-private val requestConfig = RequestConfig.custom()
-        .setCookieSpec(CookieSpecs.STANDARD)
-        .setExpectContinueEnabled(false)
-        .setContentCompressionEnabled(true)
-        .setRedirectsEnabled(true)
-        .build()
 
 class Requests(private val krawlConfig: KrawlConfig,
-               private val httpClient: CloseableHttpClient =
-               HttpClients.custom()
-                       .setDefaultRequestConfig(requestConfig)
-                       .setUserAgent(krawlConfig.userAgent)
-                       .setConnectionManager(pcm).build()) : RequestProviderIf {
+               private var httpClient: CloseableHttpClient? = null) : RequestProviderIf {
+
+    init {
+        if (httpClient == null) {
+            val requestConfig = RequestConfig.custom()
+                    .setCookieSpec(CookieSpecs.STANDARD)
+                    .setExpectContinueEnabled(false)
+                    .setContentCompressionEnabled(true)
+                    .setRedirectsEnabled(true)
+                    .setConnectionRequestTimeout(krawlConfig.connectionRequestTimeout)
+                    .setConnectTimeout(krawlConfig.connectTimeout)
+                    .setSocketTimeout(krawlConfig.socketTimeout)
+                    .build()
+
+            httpClient = HttpClients.custom()
+                    .setDefaultRequestConfig(requestConfig)
+                    .setUserAgent(krawlConfig.userAgent)
+                    .setConnectionManager(pcm).build()
+        }
+    }
 
     /** Check a URL and return it's status code
      * @param url KrawlUrl: the url to check
@@ -103,7 +112,7 @@ class Requests(private val krawlConfig: KrawlConfig,
         }
 
         val resp: RequestResponse = try {
-            val response: HttpResponse? = httpClient.execute(req)
+            val response: HttpResponse? = httpClient!!.execute(req)
             if (response == null) ErrorResponse(url) else retFun(url, response)
         } catch (e: Exception) {
             throw ContentFetchError(url, e)

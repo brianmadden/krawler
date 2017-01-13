@@ -32,15 +32,24 @@ class KrawlConfig(
         // Default: 200ms
         val politenessDelay: Long = 200,
         // User agent string
-        val userAgent: String = "io.thelandscape.Krawler Web Crawler",
+        val userAgent: String = "io.thelandscape.Krawler Web Crawler Framework",
         // Directory where KrawlQueue will be persisted
         val crawlDirectory: String = ".krawl",
         // Should the Krawl progress persist?
         val persistentCrawl: Boolean = false,
         // Maximum number of queued URLs
         val maximumQueueSize: Int = 50000,
-        // Length of time to sleep when queue becomes empty
-        emptyQueueWaitTime: Long = 10
+        // Length of time (in seconds) to wait before giving up and calling it quits
+        emptyQueueWaitTime: Long = 10,
+        // The timeout in milliseconds used when requesting a connection. 0 = infinite, -1 = system default
+        // Default: -1
+        val connectionRequestTimeout: Int = -1,
+        // Maximum period inactivity between two consecutive data packets. 0 = infinite, -1 = system default
+        // Default: -1
+        val socketTimeout: Int = -1,
+        // Connect timeout in milliseconds until a connection is established. 0 = infinite, -1 = system default
+        val connectTimeout: Int = -1
+
 ) {
     // Length of time to sleep when queue becomes empty
     var emptyQueueWaitTime: Long = emptyQueueWaitTime
