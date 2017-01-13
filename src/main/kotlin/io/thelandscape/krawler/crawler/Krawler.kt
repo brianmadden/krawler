@@ -22,6 +22,9 @@ import io.thelandscape.krawler.HSQLConnection
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.History.KrawlHistoryHSQLDao
 import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueHSQLDao
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueEntry
 import io.thelandscape.krawler.http.*
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
@@ -39,15 +42,31 @@ import kotlin.concurrent.write
  *
  */
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
-                       private val krawlHistory: KrawlHistoryIf =
-                       KrawlHistoryHSQLDao(HSQLConnection(config.persistentKrawl, config.crawlDirectory).hsqlSession),
+                       private var krawlHistory: KrawlHistoryIf? = null,
+                       private var krawlQueue: KrawlQueueIf? = null,
                        private val requestProvider: RequestProviderIf = Requests(config),
-                       private val threadpool: ThreadPoolExecutor = ThreadPoolExecutor(config.numThreads,
+                       private val threadpool: ThreadPoolExecutor = ThreadPoolExecutor(
                                config.numThreads,
-                               config.emptyQueueWaitTime, TimeUnit.SECONDS,
-                               LinkedBlockingQueue<Runnable>())) {
+                               config.numThreads,
+                               config.emptyQueueWaitTime,
+                               TimeUnit.SECONDS,
+                               LinkedBlockingQueue<Runnable>(config.maximumQueueSize))) {
 
     init {
+        if (krawlHistory == null || krawlQueue == null) {
+            val hsqlConnection: HSQLConnection = HSQLConnection(config.persistentKrawl, config.crawlDirectory)
+
+            if (krawlHistory == null)
+                krawlHistory = KrawlHistoryHSQLDao(hsqlConnection.hsqlSession)
+
+            // This is safe because we don't have any KrawlHistoryIf implementations other than HSQL
+            val histDao: KrawlHistoryHSQLDao = krawlHistory as KrawlHistoryHSQLDao
+
+            if (krawlQueue == null)
+                krawlQueue = KrawlQueueHSQLDao(hsqlConnection.hsqlSession, histDao)
+
+        }
+
         // Set the core threadpool threads to destroy themselves after config.emptyQueueWaitTime
         threadpool.allowCoreThreadTimeOut(true)
     }
@@ -167,8 +186,10 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
         val entries: List<KrawlQueueEntry> = krawlUrls.map { KrawlQueueEntry(it.canonicalForm) }
 
+        krawlQueue!!.push(entries)
+
         onCrawlStart()
-        entries.forEach { threadpool.submit { doCrawl(it) } }
+        (1..entries.size).forEach { threadpool.submit { doCrawl() } }
         while(!threadpool.isTerminated && threadpool.corePoolSize != 0) { Thread.sleep(250) }
         onCrawlEnd()
     }
@@ -194,8 +215,10 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
         val entries: List<KrawlQueueEntry> = krawlUrls.map { KrawlQueueEntry(it.canonicalForm) }
 
+        krawlQueue!!.push(entries)
+
         onCrawlStart()
-        entries.forEach { threadpool.submit { doCrawl(it) } }
+        (1..entries.size).forEach { threadpool.submit { doCrawl() } }
     }
 
     /**
@@ -234,11 +257,35 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             }
         }
 
-    internal fun doCrawl(entry: KrawlQueueEntry) {
+    internal fun doCrawl() {
         // If we're done, we're done
         if(!continueCrawling) return
 
-        val krawlUrl: KrawlUrl = KrawlUrl.new(entry.url)
+        var emptyQueueWaitCount: Long = 0
+        // Pop a URL off the queue
+        var entry: KrawlQueueEntry? = krawlQueue!!.pop()
+        if (entry == null) {
+
+            // Wait for the configured period for more URLs
+            while (emptyQueueWaitCount < config.emptyQueueWaitTime) {
+                Thread.sleep(100)
+                emptyQueueWaitCount++
+
+                // Try to pop again
+                entry = krawlQueue!!.pop()
+
+                // If we have something, reset the count and move on
+                if (entry != null) {
+                    break
+                }
+
+                // If we've hit the limit, time to quit
+                if (emptyQueueWaitCount == config.emptyQueueWaitTime)
+                    return
+            }
+        }
+
+        val krawlUrl: KrawlUrl = KrawlUrl.new(entry!!.url)
         val depth: Int = entry.depth
 
         val parent: KrawlUrl = KrawlUrl.new(entry.parent.url)
@@ -249,11 +296,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             return
 
         val history: KrawlHistoryEntry =
-                if (krawlHistory.hasBeenSeen(krawlUrl)) { // If it has been seen
+                if (krawlHistory!!.hasBeenSeen(krawlUrl)) { // If it has been seen
                     onRepeatVisit(krawlUrl, parent)
                     return
                 } else { // If it
-                    krawlHistory.insert(krawlUrl)
+                    krawlHistory!!.insert(krawlUrl)
                 }
 
         // If we're supposed to visit this, get the HTML and call visit
@@ -277,7 +324,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                     .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1) }
 
             // Insert the URLs to the queue now
-            links.forEach { threadpool.submit { doCrawl(it) } }
+            krawlQueue!!.push(links)
 
             // Finally call visit
             visit(krawlUrl, doc)
@@ -299,5 +346,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             check(krawlUrl, code)
         }
+
+        // Schedule the next page
+        threadpool.submit { doCrawl() }
     }
 }
