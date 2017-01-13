@@ -28,10 +28,10 @@ import java.time.LocalDateTime
 
 internal class HSQLConnection(fileBacked: Boolean, fileName: String = ".krawl_tmp") {
 
-    var ds: HikariDataSource = HikariDataSource()
+    var ds: HikariDataSource
         private set
 
-    var hsqlSession: ThreadLocalSession? = null
+    var hsqlSession: ThreadLocalSession
         private set
 
     init {
@@ -51,4 +51,6 @@ internal class HSQLConnection(fileBacked: Boolean, fileName: String = ".krawl_tm
         ds = HikariDataSource(config)
         hsqlSession = ThreadLocalSession(ds, HsqlDialect(), LoggingInterceptor())
     }
+
+
 }

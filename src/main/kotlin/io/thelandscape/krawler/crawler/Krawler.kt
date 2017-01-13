@@ -40,7 +40,7 @@ import kotlin.concurrent.write
  */
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                        private val krawlHistory: KrawlHistoryIf =
-                       KrawlHistoryHSQLDao(HSQLConnection(config.persistentKrawl, config.crawlDirectory).hsqlSession!!),
+                       KrawlHistoryHSQLDao(HSQLConnection(config.persistentKrawl, config.crawlDirectory).hsqlSession),
                        private val requestProvider: RequestProviderIf = Requests(config),
                        private val threadpool: ThreadPoolExecutor = ThreadPoolExecutor(config.numThreads,
                                config.numThreads,
@@ -169,7 +169,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
         onCrawlStart()
         entries.forEach { threadpool.submit { doCrawl(it) } }
-        while(!threadpool.isTerminated || threadpool.corePoolSize != 0) { Thread.sleep(500) }
+        while(!threadpool.isTerminated && threadpool.corePoolSize != 0) { Thread.sleep(250) }
         onCrawlEnd()
     }
 
@@ -258,7 +258,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
         // If we're supposed to visit this, get the HTML and call visit
         if (shouldVisit(krawlUrl)) {
-            visitCount += 1 // This will also set continueCrawling to false if the totalPages has been hit
+            visitCount++ // This will also set continueCrawling to false if the totalPages has been hit
 
             val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
 
@@ -286,7 +286,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         // If we're supposed to check this, get the status code and call check
         if (shouldCheck(krawlUrl)) {
             // Increment the check count
-            visitCount += 1
+            visitCount++
 
             val doc: RequestResponse = requestProvider.checkUrl(krawlUrl)
 

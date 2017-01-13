@@ -17,9 +17,13 @@
  */
 
 import io.thelandscape.krawler.crawler.KrawlConfig
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
 import java.time.LocalTime
 
 fun main(args: Array<String>) {
+
+    val logger: Logger = LogManager.getLogger("krawlerExample")
 
     val config: KrawlConfig = KrawlConfig(totalPages = 100, numThreads = 4)
     val k = SimpleExample(config)

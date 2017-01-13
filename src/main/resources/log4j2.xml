@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration status="WARN">
     <Appenders>
-        <RollingFile host="RollingFile" fileName="logs/krawler.log"
+        <RollingFile name="RollingFile" fileName="logs/krawler.log"
                      filePattern="logs/hcrawl_%i.log.gz">
             <PatternLayout>
                 <Pattern>%d %p %c{1.} [%t] %m%n</Pattern>
@@ -12,7 +12,7 @@
             </Policies>
             <DefaultRolloverStrategy max="10"/>
         </RollingFile>
-        <Console host="Console" target="SYSTEM_OUT">
+        <Console name="Console" target="SYSTEM_OUT">
             <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
         </Console>
     </Appenders>
@@ -21,6 +21,6 @@
             <!--<AppenderRef ref="Console" />
             <AppenderRef ref="RollingFile"/>-->
         </Root>
-        <logger host="org.apache.http.client.protocol.ResponseProcessCookies" level="fatal"></logger>
+        <logger name="org.apache.http.client.protocol.ResponseProcessCookies" level="fatal"></logger>
     </Loggers>
 </Configuration>

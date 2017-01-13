@@ -35,11 +35,11 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
     }
 
     override fun visit(url: KrawlUrl, doc: KrawlDocument) {
-        pagesCrawled.add(url.canonicalForm)
+        println("${this.visitCount}. Crawling ${url.canonicalForm}")
     }
 
     override fun onCrawlEnd() {
-        println("Crawled the following $visitCount pages:")
+        println("Crawled $visitCount pages.")
         pagesCrawled.forEach(::println)
     }
 }

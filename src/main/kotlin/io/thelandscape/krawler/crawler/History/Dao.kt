@@ -21,6 +21,8 @@ package io.thelandscape.krawler.crawler.History
 import com.github.andrewoma.kwery.core.Session
 import com.github.andrewoma.kwery.mapper.*
 import com.github.andrewoma.kwery.mapper.util.camelToLowerUnderscore
+import io.thelandscape.krawler.HSQLConnection
+import io.thelandscape.krawler.crawler.KrawlConfig
 import io.thelandscape.krawler.http.KrawlUrl
 import java.time.LocalDateTime
 
@@ -42,6 +44,7 @@ object krawlHistoryTable : Table<KrawlHistoryEntry, Long>("KrawlHistory",
 /**
  * KrawlFrontier HSQL Dao
  */
+
 class KrawlHistoryHSQLDao(session: Session):
         KrawlHistoryIf,
         AbstractDao<KrawlHistoryEntry, Long>(session,
