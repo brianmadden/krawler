@@ -19,7 +19,8 @@
 import com.nhaarman.mockito_kotlin.*
 import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
 import io.thelandscape.krawler.crawler.KrawlConfig
-import io.thelandscape.krawler.crawler.KrawlQueueEntry
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueEntry
 import io.thelandscape.krawler.crawler.Krawler
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
@@ -37,6 +38,7 @@ class KrawlerTest {
     val exampleUrl = KrawlUrl.new("http://www.example.org")
     val mockConfig = KrawlConfig(emptyQueueWaitTime = 1)
     val mockHistory = mock<KrawlHistoryIf>()
+    val mockQueue = mock<KrawlQueueIf>()
     val mockRequests = mock<RequestProviderIf>()
     val mockThreadFactory = mock<ThreadFactory>()
     val threadpool: ThreadPoolExecutor =
@@ -47,8 +49,9 @@ class KrawlerTest {
 
     class testCrawler(x: KrawlConfig,
                       w: KrawlHistoryIf,
+                      y: KrawlQueueIf,
                       v: RequestProviderIf,
-                      z: ThreadPoolExecutor): Krawler(x, w, v, z) {
+                      z: ThreadPoolExecutor): Krawler(x, w, y, v, z) {
         override fun shouldVisit(url: KrawlUrl): Boolean {
             return true
         }
@@ -65,8 +68,8 @@ class KrawlerTest {
 
     }
 
-    val realThreadpoolTestKrawler = testCrawler(mockConfig, mockHistory, mockRequests, threadpool)
-    val mockThreadpoolTestKrawler = testCrawler(mockConfig, mockHistory, mockRequests, mockThreadpool)
+    val realThreadpoolTestKrawler = testCrawler(mockConfig, mockHistory, mockQueue, mockRequests, threadpool)
+    val mockThreadpoolTestKrawler = testCrawler(mockConfig, mockHistory, mockQueue, mockRequests, mockThreadpool)
 
     @Before fun setUp() {
         MockitoKotlin.registerInstanceCreator { KrawlUrl.new("") }
