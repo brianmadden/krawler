@@ -20,46 +20,38 @@ import com.nhaarman.mockito_kotlin.*
 import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
 import io.thelandscape.krawler.crawler.KrawlConfig
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
-import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueEntry
 import io.thelandscape.krawler.crawler.Krawler
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestProviderIf
 import org.junit.Before
 import org.junit.Test
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadFactory
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
-
-class MockQueue : KrawlQueueIf {
-    val back: MutableList<QueueEntry> = mutableListOf()
-
-    override fun pop(): QueueEntry? {
-        return if (back.size > 0) back.removeAt(0) else null
-    }
-
-    override fun push(urls: List<QueueEntry>): List<QueueEntry> {
-        urls.forEach { back.add(back.size, it) }
-        return urls
-    }
-
-}
 
 class KrawlerTest {
 
     val exampleUrl = KrawlUrl.new("http://www.example.org")
     val mockConfig = KrawlConfig(emptyQueueWaitTime = 1)
-    val mockQueue = MockQueue()
     val mockHistory = mock<KrawlHistoryIf>()
+    val mockQueue = mock<KrawlQueueIf>()
     val mockRequests = mock<RequestProviderIf>()
-    val mockThreadfactory = mock<ThreadFactory>()
-    val mockThreadpool = Executors.newCachedThreadPool(mockThreadfactory)
+    val mockThreadFactory = mock<ThreadFactory>()
+    val threadpool: ThreadPoolExecutor =
+            ThreadPoolExecutor(4, 4, 1000L, TimeUnit.MILLISECONDS, LinkedBlockingQueue<Runnable>(), mockThreadFactory)
+    val mockThreadpool = mock<ThreadPoolExecutor>()
 
     val preparedResponse = KrawlDocument(exampleUrl, prepareResponse(200, ""))
 
-    class testCrawler(x: KrawlConfig, y: KrawlQueueIf,
-                      w: KrawlHistoryIf, v: RequestProviderIf, z: ExecutorService): Krawler(x, y, w, v, z) {
+    class testCrawler(x: KrawlConfig,
+                      w: KrawlHistoryIf,
+                      y: KrawlQueueIf,
+                      v: RequestProviderIf,
+                      z: ThreadPoolExecutor): Krawler(x, w, y, v, z) {
         override fun shouldVisit(url: KrawlUrl): Boolean {
             return true
         }
@@ -76,7 +68,8 @@ class KrawlerTest {
 
     }
 
-    val testKrawler = testCrawler(mockConfig, mockQueue, mockHistory, mockRequests, mockThreadpool)
+    val realThreadpoolTestKrawler = testCrawler(mockConfig, mockHistory, mockQueue, mockRequests, threadpool)
+    val mockThreadpoolTestKrawler = testCrawler(mockConfig, mockHistory, mockQueue, mockRequests, mockThreadpool)
 
     @Before fun setUp() {
         MockitoKotlin.registerInstanceCreator { KrawlUrl.new("") }
@@ -86,21 +79,19 @@ class KrawlerTest {
      * Test that the seed URL is added to the krawl queue and that the threadpool is started
      */
     @Test fun testStartBlocking() {
-        val url: List<String> = listOf("http://www.test.com/")
-        testKrawler.startNonblocking(url)
+        val url: List<String> = listOf("1", "2", "3", "4")
+        whenever(mockThreadpool.isTerminated).thenReturn(true)
+        mockThreadpoolTestKrawler.start(url)
 
-        val qe: QueueEntry = mockQueue.back.first()
-        assertEquals("http://www.test.com/", qe.url)
-
-        // Verify submit gets called on the threadpool the number of times specified in the config
-        verify(mockThreadfactory, times(mockConfig.numThreads)).newThread(any())
+        // Verify submit gets called on the threadpool for each of the URLs
+        verify(mockThreadpool, times(url.size)).submit(any())
     }
 
     /**
      * Test that when stop is called we try to shutdown
      */
     @Test fun testStop() {
-        testKrawler.stop()
+        mockThreadpoolTestKrawler.stop()
         verify(mockThreadpool).shutdown()
     }
 
@@ -108,8 +99,8 @@ class KrawlerTest {
      * Test that when shutdown is called we try to shutdownNow
      */
     @Test fun testShutdown() {
-        testKrawler.shutdown()
-        verify(mockThreadpool).shutdownNow()
+        mockThreadpoolTestKrawler.shutdown()
+        verify(mockThreadpool, atLeastOnce()).shutdownNow()
     }
 
     /**
@@ -117,16 +108,13 @@ class KrawlerTest {
      */
 
     @Test fun testDoCrawl() {
-        // Insert some stuff into the queue
-        mockQueue.push(listOf(QueueEntry("http://www.test.com")))
-
         // Make the hasBeenSeen return true
         whenever(mockHistory.hasBeenSeen(any())).thenReturn(false)
         // Make sure we get a request response
         whenever(mockRequests.getUrl(any())).thenReturn(preparedResponse)
 
-        // Run doCrawl
-        testKrawler.doCrawl()
+        // Insert some stuff into the queue
+        realThreadpoolTestKrawler.doCrawl(KrawlQueueEntry("http://www.test.com"))
 
         // Ensure we've called to verify this is a unique URL
         verify(mockHistory).hasBeenSeen(any())
@@ -134,7 +122,7 @@ class KrawlerTest {
         verify(mockHistory).insert(any())
 
         // The global visit count should also be 1
-        assertEquals(1, testKrawler.visitCount)
+        assertEquals(1, realThreadpoolTestKrawler.visitCount)
     }
 
 }

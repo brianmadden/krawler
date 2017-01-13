@@ -1,5 +1,3 @@
-package io.thelandscape.krawler.crawler.KrawlQueue
-
 /**
  * Created by brian.a.madden@gmail.com on 11/1/16.
  *
@@ -18,11 +16,12 @@ package io.thelandscape.krawler.crawler.KrawlQueue
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+package io.thelandscape.krawler.crawler.KrawlQueue
 
 /**
  * Interface representing a KrawlQueue
  */
 interface KrawlQueueIf {
-    fun pop (): QueueEntry?
-    fun push (urls: List<QueueEntry>): List<QueueEntry>
+    fun pop (): KrawlQueueEntry?
+    fun push (urls: List<KrawlQueueEntry>): List<KrawlQueueEntry>
 }

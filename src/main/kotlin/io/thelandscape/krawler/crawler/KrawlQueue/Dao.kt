@@ -1,17 +1,3 @@
-package io.thelandscape.krawler.crawler.KrawlQueue
-
-import com.github.andrewoma.kwery.core.Session
-import com.github.andrewoma.kwery.fetcher.GraphFetcher
-import com.github.andrewoma.kwery.fetcher.Node
-import com.github.andrewoma.kwery.fetcher.Property
-import com.github.andrewoma.kwery.fetcher.Type
-import com.github.andrewoma.kwery.mapper.*
-import com.github.andrewoma.kwery.mapper.util.camelToLowerUnderscore
-import io.thelandscape.krawler.crawler.History.KrawlHistory
-import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
-import io.thelandscape.krawler.crawler.History.KrawlHistoryHSQLDao
-import io.thelandscape.krawler.hsqlSession
-
 /**
  * Created by brian.a.madden@gmail.com on 10/31/16.
  *
@@ -30,30 +16,42 @@ import io.thelandscape.krawler.hsqlSession
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+package io.thelandscape.krawler.crawler.KrawlQueue
+
+import com.github.andrewoma.kwery.core.Session
+import com.github.andrewoma.kwery.fetcher.GraphFetcher
+import com.github.andrewoma.kwery.fetcher.Node
+import com.github.andrewoma.kwery.fetcher.Property
+import com.github.andrewoma.kwery.fetcher.Type
+import com.github.andrewoma.kwery.mapper.*
+import com.github.andrewoma.kwery.mapper.util.camelToLowerUnderscore
+import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
+import io.thelandscape.krawler.crawler.History.KrawlHistoryHSQLDao
+import java.util.concurrent.TimeUnit
+
 object historyConverter :
         SimpleConverter<KrawlHistoryEntry>( { row, c -> KrawlHistoryEntry(row.long(c)) }, KrawlHistoryEntry::id)
 
-object krawlQueueTable : Table<QueueEntry, String>("krawlQueue",
+object krawlQueueTable : Table<KrawlQueueEntry, String>("krawlQueue",
         TableConfiguration(standardDefaults + timeDefaults + reifiedValue(KrawlHistoryEntry()),
                 standardConverters + timeConverters + reifiedConverter(historyConverter), camelToLowerUnderscore)) {
 
-    val Url by col(QueueEntry::url, id = true)
-    val Parent by col (QueueEntry::parent)
-    val Depth by col(QueueEntry::depth)
-    val Timestamp by col(QueueEntry::timestamp)
+    val Url by col(KrawlQueueEntry::url, id = true)
+    val Parent by col (KrawlQueueEntry::parent)
+    val Depth by col(KrawlQueueEntry::depth)
+    val Timestamp by col(KrawlQueueEntry::timestamp)
 
     override fun idColumns(id: String) = setOf(Url of id)
 
-    override fun create(value: Value<QueueEntry>) =
-            QueueEntry(value of Url, value of Parent, value of Depth, value of Timestamp)
+    override fun create(value: Value<KrawlQueueEntry>) =
+            KrawlQueueEntry(value of Url, value of Parent, value of Depth, value of Timestamp)
 
 }
 
-internal val KrawlQueueDao = KrawlQueueHSQLDao(hsqlSession)
-
-class KrawlQueueHSQLDao(session: Session,
-                        private val histDao: KrawlHistoryHSQLDao = KrawlHistory):
-        KrawlQueueIf, AbstractDao<QueueEntry, String>(session, krawlQueueTable, QueueEntry::url) {
+// TODO: Figure out how to allow this to take a generic KrawlHistoryIf
+// rather than an HSQLDao while keeping the interface clean
+class KrawlQueueHSQLDao(session: Session, private val histDao: KrawlHistoryHSQLDao):
+        KrawlQueueIf, AbstractDao<KrawlQueueEntry, String>(session, krawlQueueTable, KrawlQueueEntry::url) {
 
     init {
         // Create queue table
@@ -61,12 +59,12 @@ class KrawlQueueHSQLDao(session: Session,
                 "(url VARCHAR(2048) NOT NULL, parent INT, depth INT, timestamp TIMESTAMP)")
     }
 
-    override fun pop(): QueueEntry? {
+    override fun pop(): KrawlQueueEntry? {
         val historyEntry = Type(KrawlHistoryEntry::id, { histDao.findByIds(it) })
         val queueEntry = Type(
-                QueueEntry::url,
+                KrawlQueueEntry::url,
                 { this.findByIds(it) },
-                listOf(Property(QueueEntry::parent,  historyEntry, { it.parent.id }, { c, t -> c.copy(parent = t) })))
+                listOf(Property(KrawlQueueEntry::parent,  historyEntry, { it.parent.id }, { c, t -> c.copy(parent = t) })))
 
         val fetcher: GraphFetcher = GraphFetcher(setOf(queueEntry, historyEntry))
 
@@ -76,11 +74,11 @@ class KrawlQueueHSQLDao(session: Session,
     }
 
     private val syncLock = Any()
-    private fun pop(n: Int): List<QueueEntry> {
+    private fun pop(n: Int): List<KrawlQueueEntry> {
 
         val selectSql = "SELECT TOP :n $columns FROM ${table.name}"
         val params = mapOf("n" to n)
-        var out: List<QueueEntry> = listOf()
+        var out: List<KrawlQueueEntry> = listOf()
         // Synchronize this to prevent race conditions between popping and deleting
         synchronized(syncLock) {
             out = session.select(selectSql, params, mapper = table.rowMapper())
@@ -91,7 +89,7 @@ class KrawlQueueHSQLDao(session: Session,
         return out
     }
 
-    override fun push(urls: List<QueueEntry>): List<QueueEntry> {
+    override fun push(urls: List<KrawlQueueEntry>): List<KrawlQueueEntry> {
         return this.batchInsert(urls)
     }
 }

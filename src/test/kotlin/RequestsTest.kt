@@ -23,11 +23,15 @@ import com.nhaarman.mockito_kotlin.verify
 import io.thelandscape.krawler.crawler.KrawlConfig
 import io.thelandscape.krawler.http.ContentFetchError
 import io.thelandscape.krawler.http.KrawlUrl
+import io.thelandscape.krawler.http.RequestTracker
 import io.thelandscape.krawler.http.Requests
 import org.apache.http.impl.client.CloseableHttpClient
-import org.junit.Before
 import org.junit.Test
 import java.time.Instant
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class RequestsTest {
@@ -36,7 +40,7 @@ class RequestsTest {
     val config: KrawlConfig = KrawlConfig()
     val request: Requests = Requests(config, mockHttpClient)
     val testUrl = KrawlUrl.new("http://httpbin.org")
-    val testUrl2 = KrawlUrl.new("http://httpbin.org/get")
+    val testUrl2 = KrawlUrl.new("http://nothttpbin.org/1/")
 
     @Test fun testRequestCheck() {
         try {
@@ -51,26 +55,61 @@ class RequestsTest {
 
     @Test fun testRequestGet() {
 
+        val threadpool: ExecutorService = Executors.newFixedThreadPool(4)
+        val numTimes = 10
         val start = Instant.now().toEpochMilli()
-
-        try {
-            request.getUrl(testUrl)
-        } catch (e: ContentFetchError) {
-            // Ignore this, it's expected
+        (1 .. numTimes).forEach {
+            try {
+                request.getUrl(testUrl)
+            } catch (e: ContentFetchError) {
+                // Ignore this, it's expected
+            }
+            // Issue two requests
+            try {
+                request.getUrl(testUrl2)
+            } catch (e: ContentFetchError) {
+                // Ignore this, it's expected
+            }
         }
-
-        try {
-            request.getUrl(testUrl2)
-        } catch (e: ContentFetchError) {
-            // Ignore this, it's expected
-        }
-
+        threadpool.shutdown()
+        while(!threadpool.isTerminated) {}
         val end = Instant.now().toEpochMilli()
 
         // Make sure that the politeness delay is respected
-        assertTrue {end - start > config.politenessDelay}
+        // This delay should take politeness delay * (n - 1) requests (first doesn't wait)
+        assertTrue {end - start > config.politenessDelay * (numTimes - 1)}
 
         // and that the httpClient was called
-        verify(mockHttpClient, times(2)).execute(any())
+        verify(mockHttpClient, times(numTimes * 2)).execute(any())
+    }
+}
+
+
+class RequestTrackerTest {
+
+    val requestTracker: RequestTracker = RequestTracker()
+
+    @Test fun testGetLock() {
+        val first = requestTracker.getLock("test")
+        val second = requestTracker.getLock("test")
+        val third = requestTracker.getLock("test2")
+
+        // Test that the same parameter actually gets the same lock
+        assertEquals(first, second)
+        // Test that a different parameter gets a different lock
+        assertNotEquals(first, third)
+    }
+
+    @Test fun testGetAndSetTimestamp() {
+        // First test that the inital timestamp is zero
+        val first = requestTracker.getTimestamp("test")
+        assertEquals(0, first)
+
+        // Next test that setting the timestamp works properly
+        val now = Instant.now().toEpochMilli()
+        requestTracker.setTimestamp("test", now)
+
+        val second = requestTracker.getTimestamp("test")
+        assertEquals(now, second)
     }
 }

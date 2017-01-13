@@ -18,18 +18,21 @@
 
 package io.thelandscape.krawler.crawler
 
-import io.thelandscape.krawler.crawler.History.KrawlHistory
+import io.thelandscape.krawler.HSQLConnection
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
+import io.thelandscape.krawler.crawler.History.KrawlHistoryHSQLDao
 import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
-import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueDao
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
-import io.thelandscape.krawler.crawler.KrawlQueue.QueueEntry
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueHSQLDao
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueEntry
 import io.thelandscape.krawler.http.*
-import java.util.concurrent.*
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
-import kotlin.concurrent.thread
 import kotlin.concurrent.write
+
 
 /**
  * Class defines the operations and data structures used to perform a web crawl.
@@ -39,10 +42,34 @@ import kotlin.concurrent.write
  *
  */
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
-                       private val queue: KrawlQueueIf = KrawlQueueDao,
-                       private val krawlHistory: KrawlHistoryIf = KrawlHistory,
+                       private var krawlHistory: KrawlHistoryIf? = null,
+                       private var krawlQueue: KrawlQueueIf? = null,
                        private val requestProvider: RequestProviderIf = Requests(config),
-                       private val threadpool: ExecutorService = Executors.newFixedThreadPool(config.numThreads)) {
+                       private val threadpool: ThreadPoolExecutor = ThreadPoolExecutor(
+                               config.numThreads,
+                               config.numThreads,
+                               config.emptyQueueWaitTime,
+                               TimeUnit.SECONDS,
+                               LinkedBlockingQueue<Runnable>(config.maximumQueueSize))) {
+
+    init {
+        if (krawlHistory == null || krawlQueue == null) {
+            val hsqlConnection: HSQLConnection = HSQLConnection(config.persistentCrawl, config.crawlDirectory)
+
+            if (krawlHistory == null)
+                krawlHistory = KrawlHistoryHSQLDao(hsqlConnection.hsqlSession)
+
+            // This is safe because we don't have any KrawlHistoryIf implementations other than HSQL
+            val histDao: KrawlHistoryHSQLDao = krawlHistory as KrawlHistoryHSQLDao
+
+            if (krawlQueue == null)
+                krawlQueue = KrawlQueueHSQLDao(hsqlConnection.hsqlSession, histDao)
+
+        }
+
+        // Set the core threadpool threads to destroy themselves after config.emptyQueueWaitTime
+        threadpool.allowCoreThreadTimeOut(true)
+    }
 
     /**
      * Override this function to determine if a URL should be visited.
@@ -62,7 +89,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      *
      * @return boolean: true if we should check, false otherwise
      */
-    abstract protected fun shouldCheck(url: KrawlUrl): Boolean
+    open protected fun shouldCheck(url: KrawlUrl): Boolean = false
 
     /**
      * Visit a URL by issuing an HTTP GET request
@@ -78,7 +105,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @param url KrawlURL: The requested URL
      * @param statusCode Int: The resulting status code from checking the URL
      */
-    abstract protected fun check(url: KrawlUrl, statusCode: Int)
+    open protected fun check(url: KrawlUrl, statusCode: Int) {
+        return
+    }
 
     /**
      * Function is called on unexpected status code (non 200).
@@ -135,61 +164,72 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      */
     open var crawlContext: Any? = null
 
+    /**
+     * Starts the Krawler with the URL provided. This method will call `onCrawlStart()`
+     * perform the crawl and then call `onCrawlEnd()`. This method will block for the duration
+     * of the crawl.
+     *
+     * @param: seedUrl String: A single seed URL
+     */
     fun start(seedUrl: String) = start(listOf(seedUrl))
 
+    /**
+     * Starts the Krawler with the URLs provided. This method will call `onCrawlStart()`
+     * perform the crawl and then call `onCrawlEnd()`. This method will block for the duration
+     * of the crawl.
+     *
+     * @param: seedUrl List<String>: A list of seed URLs
+     *
+     */
     fun start(seedUrl: List<String>) {
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
+        val entries: List<KrawlQueueEntry> = krawlUrls.map { KrawlQueueEntry(it.canonicalForm) }
 
-        // Insert the seeds
-        queue.push(krawlUrls.map{ QueueEntry(it.canonicalForm) })
+        krawlQueue!!.push(entries)
 
         onCrawlStart()
-        val threads: List<Thread> = (1..config.numThreads).map { thread { doCrawl() } }
-        threads.forEach {
-            try {
-                it.join()
-            }
-            catch (e: InterruptedException) {}
-            catch(e: ExecutionException) {}
-            catch(e: CancellationException) {}
-        }
+        (1..entries.size).forEach { threadpool.submit { doCrawl() } }
+        while(!threadpool.isTerminated && threadpool.corePoolSize != 0) { Thread.sleep(250) }
         onCrawlEnd()
     }
 
+    /**
+     * Starts the Krawler with the URL provided. This method will call `onCrawlStart()`
+     * start the crawl and then return. This method will -NOT- block during the crawl.
+     * Note that because this method does not block, it will also not call `onCrawlEnd()`.
+     *
+     * @param: seedUrl String: A single seed URL
+     */
     fun startNonblocking(seedUrl: String) = startNonblocking(listOf(seedUrl))
 
+    /**
+     * Starts the Krawler with the URLs provided. This method will call `onCrawlStart()`
+     * start the crawl and then return. This method will -NOT- block during the crawl.
+     * Note that because this method does not block, it will also not call `onCrawlEnd()`.
+     *
+     * @param: seedUrl List<String>: A list of seed URLs
+     */
     fun startNonblocking(seedUrl: List<String>) {
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
+        val entries: List<KrawlQueueEntry> = krawlUrls.map { KrawlQueueEntry(it.canonicalForm) }
 
-        // Insert the seeds
-        queue.push(krawlUrls.map{ QueueEntry(it.canonicalForm) })
+        krawlQueue!!.push(entries)
 
-        // Nonblocking so do all the work in another thread
-        thread {
-            onCrawlStart()
-
-            val threads: List<Future<*>> = (1..config.numThreads).map { threadpool.submit{ doCrawl() } }
-            threads.forEach {
-                /*
-                try {
-                    it.get()
-                }
-                catch (e: InterruptedException) {}
-                catch(e: ExecutidonException) {}
-                catch(e: CancellationException) {}
-                */
-                it.get()
-            }
-
-            onCrawlEnd()
-        }
-
+        onCrawlStart()
+        (1..entries.size).forEach { threadpool.submit { doCrawl() } }
     }
 
+    /**
+     * Attempts to stop Krawler by gracefully shutting down. All current threads will finish
+     * executing.
+     */
     fun stop() = threadpool.shutdown()
 
+    /**
+     * Attempts to stop Krawler by forcing a shutdown. Threads may be killed mid-execution.
+     */
     fun shutdown(): MutableList<Runnable> = threadpool.shutdownNow()
 
     /**
@@ -203,7 +243,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
     // Global visit count and domain visit count
     private val visitCountLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
-
     var visitCount: Int = 0
         get() = visitCountLock.read { field }
         private set(value) = visitCountLock.write {
@@ -211,100 +250,107 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             // If we're setting the visit count to the configured number of
             // pages to crawl, flip the switch to stop crawling
-            if (value == config.totalPages)
+            if (value == config.totalPages) {
                 continueCrawling = false
+                stop()
+            }
         }
 
-    internal fun doCrawl() {
-        var emptyQueueWaitCount: Int = 0
+    internal fun doCrawl(entry: KrawlQueueEntry? = krawlQueue!!.pop()) {
+        // If we're done, we're done
+        if(!continueCrawling) return
 
-        while(continueCrawling) {
-            // Pop a URL off the queue
-            var qe: QueueEntry? = queue.pop()
-            if (qe == null) {
+        var emptyQueueWaitCount: Long = 0
+        // Pop a URL off the queue
+        var entry: KrawlQueueEntry? = entry
+        if (entry == null) {
 
-                // Wait for the configured period for more URLs
-                while (emptyQueueWaitCount < config.emptyQueueWaitTime) {
-                    Thread.sleep(1000)
-                    emptyQueueWaitCount++
+            // Wait for the configured period for more URLs
+            while (emptyQueueWaitCount < config.emptyQueueWaitTime) {
+                Thread.sleep(100)
+                emptyQueueWaitCount++
 
-                    // Try to pop again
-                    qe = queue.pop()
+                // Try to pop again
+                entry = krawlQueue!!.pop()
 
-                    // If we have something, reset the count and move on
-                    if (qe != null) {
-                        emptyQueueWaitCount = 0
-                        break
-                    }
-
-                    // If we've hit the limit, time to quit
-                    if (emptyQueueWaitCount == config.emptyQueueWaitTime)
-                        return
-                }
-            }
-
-            val krawlUrl: KrawlUrl = KrawlUrl.new(qe!!.url)
-            val depth: Int = qe.depth
-
-            val parent: KrawlUrl = KrawlUrl.new(qe.parent.url)
-
-            // Make sure we're within depth limit
-            val maxDepth: Int = config.maxDepth
-            if (depth >= maxDepth && maxDepth != -1)
-                continue
-
-            val history: KrawlHistoryEntry =
-                    if (krawlHistory.hasBeenSeen(krawlUrl)) { // If it has been seen
-                        onRepeatVisit(krawlUrl, parent)
-                        continue
-                    } else { // If it
-                        krawlHistory.insert(krawlUrl)
-                    }
-
-            // If we're supposed to visit this, get the HTML and call visit
-            if (shouldVisit(krawlUrl)) {
-                visitCount += 1 // This will also set continueCrawling to false if the totalPages has been hit
-
-                val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
-
-                // If there was an error on trying to get the doc, call content fetch error
-                if (doc is ErrorResponse || doc !is KrawlDocument) {
-                    onContentFetchError(krawlUrl, ContentFetchError(krawlUrl, UnknownError()))
-                    continue
+                // If we have something, reset the count and move on
+                if (entry != null) {
+                    break
                 }
 
-                // Parse out the URLs and construct queue entries from them
-                val links: List<QueueEntry> = doc.anchorTags
-                        .filterNot { it.attr("href").startsWith("#") }
-                        .map { KrawlUrl.new(it, krawlUrl) }
-                        .filterNotNull()
-                        .filter { it.canonicalForm.isNotBlank() }
-                        .map { QueueEntry(it.canonicalForm, history, depth + 1) }
-
-                // Insert the URLs to the queue now
-                if (links.isNotEmpty())
-                    queue.push(links)
-
-                // Finally call visit
-                visit(krawlUrl, doc)
+                // If we've hit the limit, time to quit
+                if (emptyQueueWaitCount == config.emptyQueueWaitTime)
+                    return
             }
+        }
 
-            // If we're supposed to check this, get the status code and call check
-            if (shouldCheck(krawlUrl)) {
-                // Increment the check count
-                visitCount += 1
+        val krawlUrl: KrawlUrl = KrawlUrl.new(entry!!.url)
+        val depth: Int = entry.depth
 
-                val doc: RequestResponse = requestProvider.checkUrl(krawlUrl)
+        val parent: KrawlUrl = KrawlUrl.new(entry.parent.url)
 
-                if (doc is ErrorResponse || doc !is KrawlDocument) {
-                    onContentFetchError(krawlUrl, ContentFetchError(krawlUrl, UnknownError()))
-                    continue
+        // Make sure we're within depth limit
+        val maxDepth: Int = config.maxDepth
+        if (depth >= maxDepth && maxDepth != -1)
+            return
+
+        val history: KrawlHistoryEntry =
+                if (krawlHistory!!.hasBeenSeen(krawlUrl)) { // If it has been seen
+                    onRepeatVisit(krawlUrl, parent)
+                    return
+                } else { // If it
+                    krawlHistory!!.insert(krawlUrl)
                 }
 
-                val code: Int = doc.statusCode
+        // If we're supposed to visit this, get the HTML and call visit
+        if (shouldVisit(krawlUrl)) {
+            visitCount++ // This will also set continueCrawling to false if the totalPages has been hit
 
-                check(krawlUrl, code)
+            val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
+
+            // If there was an error on trying to get the doc, call content fetch error
+            if (doc is ErrorResponse || doc !is KrawlDocument) {
+                onContentFetchError(krawlUrl, ContentFetchError(krawlUrl, UnknownError()))
+                return
             }
+
+            // Parse out the URLs and construct queue entries from them
+            val links: List<KrawlQueueEntry> = doc.anchorTags
+                    .filterNot { it.attr("href").startsWith("#") }
+                    .map { KrawlUrl.new(it, krawlUrl) }
+                    .filterNotNull()
+                    .filter { it.canonicalForm.isNotBlank() }
+                    .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1) }
+
+            // Insert the URLs to the queue now
+            if (config.persistentCrawl) {
+                // Only in the persistent crawl case do we actually want to use the KrawlQueue
+                krawlQueue!!.push(links)
+                links.forEach { threadpool.submit { doCrawl() } }
+            } else {
+                // Skipping the HSQL backed queue saves us some time
+                links.forEach { threadpool.submit { doCrawl(it) } }
+            }
+
+            // Finally call visit
+            visit(krawlUrl, doc)
+        }
+
+        // If we're supposed to check this, get the status code and call check
+        if (shouldCheck(krawlUrl)) {
+            // Increment the check count
+            visitCount++
+
+            val doc: RequestResponse = requestProvider.checkUrl(krawlUrl)
+
+            if (doc is ErrorResponse || doc !is KrawlDocument) {
+                onContentFetchError(krawlUrl, ContentFetchError(krawlUrl, UnknownError()))
+                return
+            }
+
+            val code: Int = doc.statusCode
+
+            check(krawlUrl, code)
         }
     }
 }

@@ -1,8 +1,3 @@
-package io.thelandscape.krawler.crawler.KrawlQueue
-
-import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
-import java.time.LocalDateTime
-
 /**
  * Created by brian.a.madden@gmail.com on 10/31/16.
  *
@@ -21,7 +16,12 @@ import java.time.LocalDateTime
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-data class QueueEntry(val url: String,
-                      val parent: KrawlHistoryEntry = KrawlHistoryEntry(),
-                      val depth: Int = 0,
-                      val timestamp: LocalDateTime = LocalDateTime.now())
+package io.thelandscape.krawler.crawler.KrawlQueue
+
+import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
+import java.time.LocalDateTime
+
+data class KrawlQueueEntry(val url: String,
+                           val parent: KrawlHistoryEntry = KrawlHistoryEntry(),
+                           val depth: Int = 0,
+                           val timestamp: LocalDateTime = LocalDateTime.now())

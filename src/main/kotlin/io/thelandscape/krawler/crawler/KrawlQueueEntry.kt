@@ -1,5 +1,10 @@
+package io.thelandscape.krawler.crawler
+
+import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
+import java.time.LocalDateTime
+
 /**
- * Created by brian.a.madden@gmail.com on 12/11/16.
+ * Created by brian.a.madden@gmail.com on 10/31/16.
  *
  * Copyright (c) <2016> <H, llc>
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
@@ -16,21 +21,7 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package io.thelandscape.krawler.crawler.util
-
-import java.util.concurrent.locks.Lock
-
-fun <T> Lock.withPoliteLock(politeness: Long, action: () -> T): T {
-    var retVal: T? = null
-    lock()
-    try {
-        retVal = action()
-        return retVal
-    } finally {
-        // This prevents an unnecessary wait if we didn't manage to pop a URL from the list
-        if (retVal != null)
-            Thread.sleep(politeness)
-
-        unlock()
-    }
-}
+data class KrawlQueueEntry(val url: String,
+                           val parent: KrawlHistoryEntry = KrawlHistoryEntry(),
+                           val depth: Int = 0,
+                           val timestamp: LocalDateTime = LocalDateTime.now())

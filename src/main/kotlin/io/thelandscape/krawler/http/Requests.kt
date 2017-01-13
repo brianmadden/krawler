@@ -29,7 +29,9 @@ import org.apache.http.impl.client.CloseableHttpClient
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import java.time.Instant
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 
 interface RequestProviderIf {
     /**
@@ -51,12 +53,11 @@ private val requestConfig = RequestConfig.custom()
         .setRedirectsEnabled(true)
         .build()
 
-// TODO: Clean up the connection pool somewhere
-
-class Requests(val krawlConfig: KrawlConfig,
-               val httpClient: CloseableHttpClient =
+class Requests(private val krawlConfig: KrawlConfig,
+               private val httpClient: CloseableHttpClient =
                HttpClients.custom()
                        .setDefaultRequestConfig(requestConfig)
+                       .setUserAgent(krawlConfig.userAgent)
                        .setConnectionManager(pcm).build()) : RequestProviderIf {
 
     /** Check a URL and return it's status code
@@ -74,7 +75,7 @@ class Requests(val krawlConfig: KrawlConfig,
     override fun getUrl(url: KrawlUrl): RequestResponse = makeRequest(url, ::HttpGet, ::KrawlDocument)
 
     // Hash map to track requests and respect politeness
-    private val requestTracker: ConcurrentHashMap<String, Long> = ConcurrentHashMap()
+    private val requestTracker: RequestTracker = RequestTracker()
 
     /** Convenience function for building, & issuing the HttpRequest
      * @param url KrawlUrl: Url to make request to
@@ -86,14 +87,19 @@ class Requests(val krawlConfig: KrawlConfig,
                             retFun: (KrawlUrl, HttpResponse) -> RequestResponse): RequestResponse {
 
         val req: HttpUriRequest = reqFun(url.canonicalForm)
+        val host: String = url.host
 
         // Handle politeness
+
         if (krawlConfig.politenessDelay > 0) {
-            val lastRequest = requestTracker.getOrDefault(url.host, 0L)
-            val reqDelta = Instant.now().toEpochMilli() - lastRequest
-            if (reqDelta >= 0 && reqDelta < krawlConfig.politenessDelay)
+            synchronized(requestTracker.getLock(host)) {
+                val reqDelta = Instant.now().toEpochMilli() - requestTracker.getTimestamp(host)
+                if (reqDelta >= 0 && reqDelta < krawlConfig.politenessDelay)
                 // Sleep until the remainder of the politeness delay has elapsed
-                Thread.sleep(krawlConfig.politenessDelay - reqDelta)
+                    Thread.sleep(krawlConfig.politenessDelay - reqDelta)
+                // Set last request time for politeness
+                requestTracker.setTimestamp(host, Instant.now().toEpochMilli())
+            }
         }
 
         val resp: RequestResponse = try {
@@ -101,13 +107,61 @@ class Requests(val krawlConfig: KrawlConfig,
             if (response == null) ErrorResponse(url) else retFun(url, response)
         } catch (e: Exception) {
             throw ContentFetchError(url, e)
-        } finally {
-            // Set last request time for politeness
-            requestTracker[url.host] = Instant.now().toEpochMilli()
         }
+
         return resp
     }
 }
+
+/**
+ * Class to track requests timestamps, and the locks that will be used to synchronize the timestamp
+ * access.
+ */
+class RequestTracker {
+
+    private val lockMapLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
+    private val lockMap: MutableMap<String, Any> = mutableMapOf()
+    private val timestampMap: MutableMap<String, Long> = mutableMapOf()
+
+    /**
+     * Gets the lock associated with a specific host that will be used to synchronize the politeness
+     * delay code section.
+     *
+     * Note: This operation -IS- threadsafe.
+     *
+     * @param host String: The host that this lock will be associated with.
+     * @return the [Any] object that will lock the synchronized section
+     */
+    fun getLock(host: String): Any {
+        return lockMapLock.read { lockMap[host] } ?:
+                lockMapLock.write { lockMap.getOrPut(host, { Any() }) }
+    }
+
+    /**
+     * Gets the timestamp associated with a specific host, to determine when the next request is safe
+     * to send.
+     *
+     * Note: This operation is -NOT- threadsafe and should only be used in a synchronized block.
+     *
+     * @param host String: The host associated with this timestamp
+     * @return Long representing the timestamp in milliseconds since the epoch
+     */
+    fun getTimestamp(host: String): Long {
+        return timestampMap.getOrPut(host, { 0 })
+    }
+
+    /**
+     * Sets the timestamp associated with a specific host.
+     *
+     * Note: This operation is -NOT- threadsafe and should only be used in a synchronized block.
+     *
+     * @param host String: The host associated with this timestamp
+     * @param value Long: The timestamp in milliseconds since the epoch
+     * @return [Unit]
+     */
+    fun setTimestamp(host: String, value: Long) = timestampMap.put(host, value)
+}
+
 
 /**
  * Error representing any failure to fetch content.
