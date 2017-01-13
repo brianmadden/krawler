@@ -31,7 +31,7 @@ still available to facilitate validation and checking though.
 
 Gradle
 ======
-Krawler is published through jitpack.io at: https://jitpack.io/#brianmadden/krawler/ . Add the following to your `build.gradle` to get use Krawler:
+Krawler is published through jitpack.io at: https://jitpack.io/#brianmadden/krawler/ . Add jitpack.io as a repository, and krawler as a compile time dependency to your `build.gradle` to use Krawler in your project:
 
 ```groovy
  repositories {
