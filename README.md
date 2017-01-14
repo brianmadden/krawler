@@ -39,7 +39,7 @@ Krawler is published through jitpack.io at: https://jitpack.io/#brianmadden/kraw
         maven { url "https://jitpack.io" }
    }
    dependencies {
-         compile 'com.github.brianmadden:krawler:v0.1.0-beta.1'
+         compile 'com.github.brianmadden:krawler:v0.1.0-beta.2'
    }
 
 ```
