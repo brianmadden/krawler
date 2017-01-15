@@ -1,7 +1,7 @@
 /**
- * Created by brian.a.madden@gmail.com on 10/31/16.
+ * Created by brian.a.madden@gmail.com on 1/14/17.
  *
- * Copyright (c) <2016> <H, llc>
+ * Copyright (c) <2017> <H, llc>
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
  * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
@@ -16,12 +16,15 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package io.thelandscape.krawler.crawler
+package io.thelandscape.krawler.robots
 
-import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
-import java.time.LocalDateTime
+import java.util.concurrent.TimeUnit
 
-data class KrawlQueueEntry(val url: String,
-                           val parent: KrawlHistoryEntry = KrawlHistoryEntry(),
-                           val depth: Int = 0,
-                           val timestamp: LocalDateTime = LocalDateTime.now())
+data class RobotsConfig(
+        // Maximum number of entries (hosts) in the cache that stores robots.txt rules
+        val robotsCacheSize: Long = 100,
+        // Length of time after last access that an entry expires
+        val expireAfter: Long = 10,
+        // Time units for the cache expiration
+        val units: TimeUnit = TimeUnit.MINUTES
+)
