@@ -16,12 +16,14 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import com.nhaarman.mockito_kotlin.mock
-import io.thelandscape.krawler.http.*
+import com.nhaarman.mockito_kotlin.*
+import io.thelandscape.krawler.http.ErrorResponse
+import io.thelandscape.krawler.http.KrawlUrl
+import io.thelandscape.krawler.http.RequestProviderIf
+import io.thelandscape.krawler.http.RequestResponse
 import io.thelandscape.krawler.robots.RoboMinder
 import io.thelandscape.krawler.robots.RobotsTxt
 import org.junit.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -45,8 +47,13 @@ class RoboMinderTest {
     val mockRequests = mock<RequestProviderIf>()
     val minder = RoboMinder("AGENT-A", mockRequests)
 
-    @Test fun testIsSafeToVisit() {
-        TODO()
+    init {
+        MockitoKotlin.registerInstanceCreator { KrawlUrl.new("") }
+    }
+
+    @Test fun testFetch() {
+        minder.fetch("http://www.google.com")
+        verify(mockRequests).fetchRobotsTxt(KrawlUrl.new("http://www.google.com/robots.txt"))
     }
 
     @Test fun testProcess() {
@@ -80,5 +87,11 @@ class RoboMinderTest {
         assertFalse { resp(invalidUrl.path) }
         // This valid should be true
         assertTrue { resp(validUrl.path) }
+    }
+
+    @Test fun isSafeToVisit() {
+        whenever(mockRequests.fetchRobotsTxt(any())).thenReturn(specificAgentSpecificPage)
+        assertTrue { minder.isSafeToVisit(validUrl) }
+        assertFalse { minder.isSafeToVisit(invalidUrl) }
     }
 }

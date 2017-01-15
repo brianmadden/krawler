@@ -281,4 +281,13 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
 
     override fun toString(): String = canonicalForm
 
+    override fun equals(other: Any?): Boolean {
+        if (other == null)
+            return false
+
+        if (other !is KrawlUrl)
+            return false
+
+        return this.canonicalForm == other.canonicalForm
+    }
 }
