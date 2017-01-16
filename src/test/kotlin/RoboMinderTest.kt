@@ -22,25 +22,13 @@ import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestProviderIf
 import io.thelandscape.krawler.http.RequestResponse
 import io.thelandscape.krawler.robots.RoboMinder
-import io.thelandscape.krawler.robots.RobotsTxt
 import org.junit.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-private val nullUrl = KrawlUrl.new("")
 private val invalidUrl = KrawlUrl.new("http://valid.url/invalid/")
 private val validUrl = KrawlUrl.new("http://valid.url/valid")
-private val disallowAll: RobotsTxt = RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: * \n Disallow: / "))
-private val disallowMe: RobotsTxt =
-        RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: AGENT-A \n Disallow: / \n User-Agent: * \n Disallow: "))
-private val allowMe: RobotsTxt =
-        RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: AGENT-A \n Disallow: \n User-Agent: * \n Disallow: /"))
-private val allowAll: RobotsTxt = RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: * \n Disallow: "))
-private val unrelatedResponse: RobotsTxt = RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: Google \n Disallow: /"))
-private val specificAgentSpecificPage: RobotsTxt =
-        RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: AGENT-A \n Disallow: /invalid"))
-private val noResponse: RequestResponse = ErrorResponse(nullUrl)
-
+val noResponse: RequestResponse = ErrorResponse(nullUrl)
 
 class RoboMinderTest {
 
