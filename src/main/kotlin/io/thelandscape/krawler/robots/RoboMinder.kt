@@ -26,13 +26,17 @@ import io.thelandscape.krawler.http.RequestProviderIf
 import io.thelandscape.krawler.http.RequestResponse
 import io.thelandscape.krawler.http.Requests
 
+interface RoboMinderIf {
+    fun isSafeToVisit(url: KrawlUrl): Boolean
+}
+
 /**
  * Class for managing the fetching and minding of robots.txt
  *
  */
 class RoboMinder(private val userAgent: String,
                  private val request: RequestProviderIf,
-                 config: RobotsConfig = RobotsConfig()) {
+                 config: RobotsConfig = RobotsConfig()): RoboMinderIf {
 
     private val rules: LoadingCache<String, (String) -> Boolean> = CacheBuilder.newBuilder()
             .maximumSize(config.robotsCacheSize)
@@ -86,7 +90,7 @@ class RoboMinder(private val userAgent: String,
      *
      * @return true if safe to visit, false otherwise
      */
-    fun isSafeToVisit(url: KrawlUrl): Boolean {
+    override fun isSafeToVisit(url: KrawlUrl): Boolean {
 
         // Not bothering to lock this since it should be idempotent
         val withoutGetParams: String = url.path.split("?").firstOrNull() ?: url.path

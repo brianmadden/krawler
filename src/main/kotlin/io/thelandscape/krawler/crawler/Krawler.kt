@@ -22,10 +22,11 @@ import io.thelandscape.krawler.HSQLConnection
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.History.KrawlHistoryHSQLDao
 import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
-import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
-import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueHSQLDao
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueEntry
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueHSQLDao
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
 import io.thelandscape.krawler.http.*
+import io.thelandscape.krawler.robots.RoboMinderIf
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -44,6 +45,7 @@ import kotlin.concurrent.write
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                        private var krawlHistory: KrawlHistoryIf? = null,
                        private var krawlQueue: KrawlQueueIf? = null,
+                       val minder: RoboMinderIf? = null,
                        private val requestProvider: RequestProviderIf = Requests(config),
                        private val threadpool: ThreadPoolExecutor = ThreadPoolExecutor(
                                config.numThreads,
@@ -285,6 +287,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
 
         val krawlUrl: KrawlUrl = KrawlUrl.new(entry!!.url)
+
+        // If we're respecting robots.txt check if it's ok to visit this page
+        if (minder != null && !minder.isSafeToVisit(krawlUrl))
+            return
+
         val depth: Int = entry.depth
 
         val parent: KrawlUrl = KrawlUrl.new(entry.parent.url)
