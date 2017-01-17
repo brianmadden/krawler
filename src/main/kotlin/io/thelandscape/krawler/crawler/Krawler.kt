@@ -137,7 +137,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @param url KrawlUrl: The URL that failed
      * @param error ContentFetchError: The content fetch error that was thrown.
      */
-    open protected fun onContentFetchError(url: KrawlUrl, error: ContentFetchError) {
+    open protected fun onContentFetchError(url: KrawlUrl, reason: String) {
         return
     }
 
@@ -324,8 +324,13 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
 
             // If there was an error on trying to get the doc, call content fetch error
-            if (doc is ErrorResponse || doc !is KrawlDocument) {
-                onContentFetchError(krawlUrl, ContentFetchError(krawlUrl, UnknownError()))
+            if (doc is ErrorResponse) {
+                onContentFetchError(krawlUrl, doc.reason)
+                return
+            }
+            // If there was an error parsing the response, still a content fetch error
+            if (doc !is KrawlDocument) {
+                onContentFetchError(krawlUrl, "Krawler was unable to parse the response from the server.")
                 return
             }
 
@@ -358,8 +363,14 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             val doc: RequestResponse = requestProvider.checkUrl(krawlUrl)
 
-            if (doc is ErrorResponse || doc !is KrawlDocument) {
-                onContentFetchError(krawlUrl, ContentFetchError(krawlUrl, UnknownError()))
+            // If the doc is an ErrorResponse or not a KrawlDocument call onContentFetchError
+            if (doc is ErrorResponse) {
+                onContentFetchError(krawlUrl, doc.reason)
+                return
+            }
+
+            if (doc !is KrawlDocument) {
+                onContentFetchError(krawlUrl, "Krawler was unable to parse the response from the server.")
                 return
             }
 

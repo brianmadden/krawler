@@ -48,7 +48,7 @@ interface RequestProviderIf {
     /**
      * Method to get a robots.txt from a KrawlUrl
      */
-    fun fetchRobotsTxt(url: KrawlUrl): RobotsTxt
+    fun fetchRobotsTxt(url: KrawlUrl): RequestResponse
 }
 
 private val pcm: PoolingHttpClientConnectionManager = PoolingHttpClientConnectionManager()
@@ -80,10 +80,9 @@ class Requests(private val krawlConfig: KrawlConfig,
      *
      * @return [RequestResponse]: The parsed robots.txt or, or ErrorResponse on error
      */
-    override fun fetchRobotsTxt(url: KrawlUrl): RobotsTxt {
-        val host = url.host
-        val robotsRequest = KrawlUrl.new("$host/robots.txt")
-        return makeRequest(robotsRequest, ::HttpGet, ::RobotsTxt) as RobotsTxt
+    override fun fetchRobotsTxt(url: KrawlUrl): RequestResponse {
+        val robotsRequest = KrawlUrl.new("${url.hierarchicalPart}/robots.txt")
+        return makeRequest(robotsRequest, ::HttpGet, ::RobotsTxt)
     }
 
     /** Check a URL and return it's status code
@@ -132,7 +131,7 @@ class Requests(private val krawlConfig: KrawlConfig,
             val response: HttpResponse? = httpClient!!.execute(req)
             if (response == null) ErrorResponse(url) else retFun(url, response)
         } catch (e: Exception) {
-            throw ContentFetchError(url, e)
+            ErrorResponse(url, e.toString() ?: "An unknown error has occurred.")
         }
 
         return resp
@@ -187,11 +186,3 @@ class RequestTracker {
      */
     fun setTimestamp(host: String, value: Long) = timestampMap.put(host, value)
 }
-
-
-/**
- * Error representing any failure to fetch content.
- * Will contain the root cause exception as well as the requested URL.
- */
-class ContentFetchError(url: KrawlUrl, cause: Throwable):
-        Throwable("Failed to retrieve the content for ${url.canonicalForm}.", cause)

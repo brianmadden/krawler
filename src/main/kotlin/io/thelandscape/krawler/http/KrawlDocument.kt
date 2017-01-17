@@ -30,7 +30,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 interface RequestResponse
 
-data class ErrorResponse(val url: KrawlUrl) : RequestResponse
+data class ErrorResponse(val url: KrawlUrl, val reason: String = "An unknown error has occurred.") : RequestResponse
 class KrawlDocument(val url: KrawlUrl, response: HttpResponse) : RequestResponse {
 
     constructor(url: KrawlUrl, response: HttpResponse, parent: KrawlUrl): this(url, response) {
