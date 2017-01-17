@@ -118,8 +118,12 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
 
                     if (url.getOrNull(idx + 1) == '/' && url.getOrNull(idx + 2) == '/') {
                         isAbsolute = true
-                        // Move idx by 3 to the start of the host portion
-                        idx += 3
+
+                        // If we have a string of / leave only 2
+                        var n: Int = 3
+                        while (url[idx + n] == '/') n++
+                        // Move idx by n to the start of the host portion
+                        idx += n
                         // Start the host after the scheme
                         hostStart = idx
                         continue
@@ -257,6 +261,8 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
     }
 
     val normalForm: String = if (host + path == "") "" else "$scheme://$host$path"
+    // The hierarchical part is everything up to the path
+    val hierarchicalPart: String ="$scheme://$host"
 
     // Get a list of TLDs from https://publicsuffix.org/list/public_suffix_list.dat
     // These are all lazy because the suffix finder is a bit of an expensive operation that isn't always necessary.

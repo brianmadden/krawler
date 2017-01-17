@@ -25,8 +25,8 @@ import io.thelandscape.krawler.crawler.Krawler
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestProviderIf
-import io.thelandscape.krawler.robots.RoboMinder
 import io.thelandscape.krawler.robots.RoboMinderIf
+import io.thelandscape.krawler.robots.RobotsConfig
 import org.junit.Before
 import org.junit.Test
 import java.util.concurrent.LinkedBlockingQueue
@@ -53,7 +53,7 @@ class KrawlerTest {
     class testCrawler(x: KrawlConfig,
                       w: KrawlHistoryIf,
                       y: KrawlQueueIf,
-                      u: RoboMinderIf?,
+                      u: RobotsConfig?,
                       v: RequestProviderIf,
                       z: ThreadPoolExecutor): Krawler(x, w, y, u, v, z) {
         override fun shouldVisit(url: KrawlUrl): Boolean {
@@ -72,13 +72,12 @@ class KrawlerTest {
 
     }
 
-    val realThreadpoolTestKrawler =
-            testCrawler(mockConfig, mockHistory, mockQueue, mockMinder, mockRequests, threadpool)
-    val mockThreadpoolTestKrawler =
-            testCrawler(mockConfig, mockHistory, mockQueue, mockMinder, mockRequests, mockThreadpool)
+    val realThreadpoolTestKrawler = testCrawler(mockConfig, mockHistory, mockQueue, null, mockRequests, threadpool)
+    val mockThreadpoolTestKrawler = testCrawler(mockConfig, mockHistory, mockQueue, null, mockRequests, mockThreadpool)
 
     @Before fun setUp() {
         MockitoKotlin.registerInstanceCreator { KrawlUrl.new("") }
+        realThreadpoolTestKrawler.minder = mockMinder
     }
 
     /**

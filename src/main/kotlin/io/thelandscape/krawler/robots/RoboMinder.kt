@@ -95,6 +95,6 @@ class RoboMinder(private val userAgent: String,
         // Not bothering to lock this since it should be idempotent
         val withoutGetParams: String = url.path.split("?").firstOrNull() ?: url.path
 
-        return rules[url.host].invoke(withoutGetParams)
+        return rules[url.hierarchicalPart].invoke(withoutGetParams)
     }
 }

@@ -21,7 +21,7 @@ import io.thelandscape.krawler.crawler.Krawler
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
 
-class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config, minder = RoboMinder()) {
+class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
     private val FILTERS: Regex = Regex(".*(\\.(css|js|bmp|gif|jpe?g|png|tiff?|mid|mp2|mp3|mp4|wav|avi|" +
             "mov|mpeg|ram|m4v|pdf|rm|smil|wmv|swf|wma|zip|rar|gz|tar|ico))$")

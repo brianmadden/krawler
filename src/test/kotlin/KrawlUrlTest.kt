@@ -34,6 +34,15 @@ class KrawlUrlTest {
     val testUrl = KrawlUrl.new(rawUrl)
     val anchorTestUrl = KrawlUrl.new(doc)
 
+    @Test fun testHierarchicalPart() {
+        assertEquals("http://www.xyz.abc.com", testUrl.hierarchicalPart)
+    }
+
+    @Test fun testCleansExcessiveSchemeSlashes() {
+        val tester = KrawlUrl.new("http:////////testexample.com")
+        assertEquals("http://testexample.com/", tester.canonicalForm)
+    }
+
     // Test the case where scheme is to be inferred from the parent by starting the URL with //
     @Test fun testInferScheme() {
         val httpsUrl = KrawlUrl.new("https://somesafesite.com")

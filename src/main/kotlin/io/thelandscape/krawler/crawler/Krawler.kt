@@ -26,7 +26,9 @@ import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueEntry
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueHSQLDao
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
 import io.thelandscape.krawler.http.*
+import io.thelandscape.krawler.robots.RoboMinder
 import io.thelandscape.krawler.robots.RoboMinderIf
+import io.thelandscape.krawler.robots.RobotsConfig
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -45,7 +47,7 @@ import kotlin.concurrent.write
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                        private var krawlHistory: KrawlHistoryIf? = null,
                        private var krawlQueue: KrawlQueueIf? = null,
-                       val minder: RoboMinderIf? = null,
+                       val robotsConfig: RobotsConfig? = null,
                        private val requestProvider: RequestProviderIf = Requests(config),
                        private val threadpool: ThreadPoolExecutor = ThreadPoolExecutor(
                                config.numThreads,
@@ -72,6 +74,12 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         // Set the core threadpool threads to destroy themselves after config.emptyQueueWaitTime
         threadpool.allowCoreThreadTimeOut(true)
     }
+
+    /**
+     * Handle robots.txt
+     */
+    internal var minder: RoboMinderIf = RoboMinder(config.userAgent, requestProvider, robotsConfig ?: RobotsConfig())
+
 
     /**
      * Override this function to determine if a URL should be visited.
@@ -289,7 +297,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         val krawlUrl: KrawlUrl = KrawlUrl.new(entry!!.url)
 
         // If we're respecting robots.txt check if it's ok to visit this page
-        if (minder != null && !minder.isSafeToVisit(krawlUrl))
+        if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl))
             return
 
         val depth: Int = entry.depth
