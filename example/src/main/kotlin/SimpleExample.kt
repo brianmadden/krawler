@@ -20,6 +20,7 @@ import io.thelandscape.krawler.crawler.KrawlConfig
 import io.thelandscape.krawler.crawler.Krawler
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
+import java.time.LocalTime
 
 class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
@@ -35,7 +36,14 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
         println("${this.visitCount}. Crawling ${url.canonicalForm}")
     }
 
+    private var startTimestamp: Long = 0
+    private var endTimestamp: Long = 0
+
+    override fun onCrawlStart() {
+        startTimestamp = LocalTime.now().toNanoOfDay()
+    }
     override fun onCrawlEnd() {
-        println("Crawled $visitCount pages.")
+        endTimestamp = LocalTime.now().toNanoOfDay()
+        println("Crawled $visitCount pages in ${(endTimestamp - startTimestamp) / 1000000000.0} seconds.")
     }
 }

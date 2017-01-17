@@ -17,16 +17,11 @@
  */
 
 import io.thelandscape.krawler.crawler.KrawlConfig
-import java.time.LocalTime
 
 fun main(args: Array<String>) {
 
     val config: KrawlConfig = KrawlConfig(totalPages = 100, numThreads = 4)
     val k = SimpleExample(config)
 
-    val start: LocalTime = LocalTime.now()
     k.start("http://en.wikipedia.org")
-    val end: LocalTime = LocalTime.now()
-    print("Total: ${(end.toNanoOfDay() - start.toNanoOfDay()) / 1000000000.0} seconds...")
-
 }
