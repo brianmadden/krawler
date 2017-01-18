@@ -29,7 +29,7 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
     override fun shouldVisit(url: KrawlUrl): Boolean {
         val withoutGetParams: String = url.canonicalForm.split("?").first()
-        return (!FILTERS.matches(withoutGetParams) && url.host == "en.wikipedia.org")
+        return (!FILTERS.matches(withoutGetParams) && url.host == "yahoo.com")
     }
 
     override fun visit(url: KrawlUrl, doc: KrawlDocument) {

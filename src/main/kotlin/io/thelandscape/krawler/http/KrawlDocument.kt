@@ -59,14 +59,27 @@ class KrawlDocument(val url: KrawlUrl, response: HttpResponse) : RequestResponse
     val statusCode: Int = response.statusLine.statusCode
 
     /**
+     * Document as parsed by JSoup
+     */
+    val parsedDocument: Document = Jsoup.parse(rawHtml)
+
+    /**
      * Anchor tags that have the href attribute
      */
     val anchorTags: List<Element> = if (rawHtml.isNullOrEmpty()) listOf() else try {
-        val doc: Document = Jsoup.parse(rawHtml)
-        doc.getElementsByTag("a").toElementList().filter { it.hasAttr("href") }
+        parsedDocument.getElementsByTag("a").toElementList().filter { it.hasAttr("href") }
     } catch (e: Throwable) {
         listOf<Element>()
     }
+
+    /**
+     * Other outgoing links (URLs from src tags of images, scripts, etc)
+     */
+    val otherOutgoingLinks: List<String> = parsedDocument
+            .getElementsByAttribute("src")
+            .toElementList()
+            .map { it.attr("src") }
+
 
     /// Utility method to convert a NodeList to a List<Element>
     internal fun Elements.toElementList(): List<Element> {

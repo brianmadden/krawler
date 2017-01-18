@@ -335,12 +335,18 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             }
 
             // Parse out the URLs and construct queue entries from them
-            val links: List<KrawlQueueEntry> = doc.anchorTags
-                    .filterNot { it.attr("href").startsWith("#") }
-                    .map { KrawlUrl.new(it, krawlUrl) }
-                    .filterNotNull()
-                    .filter { it.canonicalForm.isNotBlank() }
-                    .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1) }
+            val links: List<KrawlQueueEntry> = listOf(
+                    // Anchor tags
+                    doc.anchorTags
+                            .filterNot { it.attr("href").startsWith("#") }
+                            .map { KrawlUrl.new(it, krawlUrl) }
+                            .filterNotNull()
+                            .filter { it.canonicalForm.isNotBlank() }
+                            .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1) },
+                    // Everything else (img tags, scripts, etc)d
+                    doc.otherOutgoingLinks.map { KrawlUrl.new(it, krawlUrl) }
+                            .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1)}
+            ).flatten()
 
             // Insert the URLs to the queue now
             if (config.persistentCrawl) {

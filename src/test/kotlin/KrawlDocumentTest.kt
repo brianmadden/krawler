@@ -43,7 +43,8 @@ internal fun prepareResponse(expectedResponseCode: Int, responseBody: String): H
 }
 
 private val mockReturn = prepareResponse(200, "<html><head><title>ABC</title></head>" +
-        "<body><a href='http://www.google.com' rel='canonical'>ABC LINK</a></body></html>")
+        "<body><a href='http://www.google.com' rel='canonical'>ABC LINK</a></body>" +
+        "<img src=\"/foo.html\" /></html>")
 
 private val mockEmptyReturn = prepareResponse(200, "")
 private val mock404Return = prepareResponse(404, "<html><body>404 Not Found!</body></html>")
@@ -73,7 +74,8 @@ class CrawlDocumentTest {
     @Test fun testRawHtmlProperty() {
         // it should have a rawHtml element with a title and one anchor tag
         assertEquals("<html><head><title>ABC</title></head>" +
-                "<body><a href='http://www.google.com' rel='canonical'>ABC LINK</a></body></html>", doc.rawHtml)
+                "<body><a href='http://www.google.com' rel='canonical'>ABC LINK</a></body>" +
+                "<img src=\"/foo.html\" /></html>", doc.rawHtml)
 
         // Empty doc should be just the empty string
         assertEquals("", emptyDoc.rawHtml)
@@ -92,6 +94,11 @@ class CrawlDocumentTest {
         assertTrue { emptyDoc.anchorTags.isEmpty() }
         // 404 doc should also have no anchor tags
         assertTrue { four04Doc.anchorTags.isEmpty() }
+    }
+
+    @Test fun testOtherOutgoingLinks() {
+        assertEquals(1, doc.otherOutgoingLinks.size)
+        assertEquals("/foo.html", doc.otherOutgoingLinks[0])
     }
 
     // it should have a status code of 200
