@@ -47,7 +47,7 @@ import kotlin.concurrent.write
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                        private var krawlHistory: KrawlHistoryIf? = null,
                        private var krawlQueue: KrawlQueueIf? = null,
-                       val robotsConfig: RobotsConfig? = null,
+                       robotsConfig: RobotsConfig? = null,
                        private val requestProvider: RequestProviderIf = Requests(config),
                        private val threadpool: ThreadPoolExecutor = ThreadPoolExecutor(
                                config.numThreads,
@@ -70,9 +70,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 krawlQueue = KrawlQueueHSQLDao(hsqlConnection.hsqlSession, histDao)
 
         }
-
-        // Set the core threadpool threads to destroy themselves after config.emptyQueueWaitTime
-        threadpool.allowCoreThreadTimeOut(true)
     }
 
     /**
@@ -199,8 +196,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         krawlQueue!!.push(entries)
 
         onCrawlStart()
-        (1..entries.size).forEach { threadpool.submit { doCrawl() } }
-        while(!threadpool.isTerminated && threadpool.corePoolSize != 0) { Thread.sleep(250) }
+        entries.forEach { threadpool.submit { doCrawl() } }
+        while(!threadpool.isTerminated && threadpool.activeCount > 0) { Thread.sleep(250) }
+        threadpool.shutdown()
         onCrawlEnd()
     }
 
@@ -262,7 +260,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             // pages to crawl, flip the switch to stop crawling
             if (value == config.totalPages) {
                 continueCrawling = false
-                stop()
             }
         }
 
