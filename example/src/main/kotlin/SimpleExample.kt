@@ -21,6 +21,9 @@ import io.thelandscape.krawler.crawler.Krawler
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
 import java.time.LocalTime
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 
 class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
@@ -32,8 +35,14 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
         return (!FILTERS.matches(withoutGetParams) && url.host == "yahoo.com")
     }
 
+
+    private val counterLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
+    private var counter: Int = 1
+        get() = counterLock.read { field }
+        set(value) = counterLock.write { field = value}
+
     override fun visit(url: KrawlUrl, doc: KrawlDocument) {
-        println("${this.visitCount}. Crawling ${url.canonicalForm}")
+        println("${counter++}. Crawling ${url.canonicalForm}")
     }
 
     private var startTimestamp: Long = 0
