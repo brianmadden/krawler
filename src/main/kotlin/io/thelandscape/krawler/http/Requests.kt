@@ -19,6 +19,7 @@
 package io.thelandscape.krawler.http
 
 import io.thelandscape.krawler.crawler.KrawlConfig
+import io.thelandscape.krawler.robots.RobotsTxt
 import org.apache.http.HttpResponse
 import org.apache.http.client.config.CookieSpecs
 import org.apache.http.client.config.RequestConfig
@@ -43,6 +44,11 @@ interface RequestProviderIf {
      * Method to get the contents of a URL
      */
     fun getUrl(url: KrawlUrl): RequestResponse
+
+    /**
+     * Method to get a robots.txt from a KrawlUrl
+     */
+    fun fetchRobotsTxt(url: KrawlUrl): RequestResponse
 }
 
 private val pcm: PoolingHttpClientConnectionManager = PoolingHttpClientConnectionManager()
@@ -69,17 +75,27 @@ class Requests(private val krawlConfig: KrawlConfig,
         }
     }
 
+    /** Fetch the robots.txt file from a domain
+     * @param url [KrawlUrl]: The URL to fetch robots from
+     *
+     * @return [RequestResponse]: The parsed robots.txt or, or ErrorResponse on error
+     */
+    override fun fetchRobotsTxt(url: KrawlUrl): RequestResponse {
+        val robotsRequest = KrawlUrl.new("${url.hierarchicalPart}/robots.txt")
+        return makeRequest(robotsRequest, ::HttpGet, ::RobotsTxt)
+    }
+
     /** Check a URL and return it's status code
      * @param url KrawlUrl: the url to check
      *
-     * @return RequestResponse: KrawlDocument containing the status code, or ErrorResponse on error
+     * @return [RequestResponse]: KrawlDocument containing the status code, or ErrorResponse on error
      */
    override fun checkUrl(url: KrawlUrl): RequestResponse = makeRequest(url, ::HttpHead, ::KrawlDocument)
 
     /** Get the contents of a URL
      * @param url KrawlUrl: the URL to get the contents of
      *
-     * @return KrawlDocument: The parsed HttpResponse returned by the GET request
+     * @return [RequestResponse]: The parsed HttpResponse returned by the GET request
      */
     override fun getUrl(url: KrawlUrl): RequestResponse = makeRequest(url, ::HttpGet, ::KrawlDocument)
 
@@ -115,7 +131,7 @@ class Requests(private val krawlConfig: KrawlConfig,
             val response: HttpResponse? = httpClient!!.execute(req)
             if (response == null) ErrorResponse(url) else retFun(url, response)
         } catch (e: Exception) {
-            throw ContentFetchError(url, e)
+            ErrorResponse(url, e.toString() ?: "An unknown error has occurred.")
         }
 
         return resp
@@ -170,11 +186,3 @@ class RequestTracker {
      */
     fun setTimestamp(host: String, value: Long) = timestampMap.put(host, value)
 }
-
-
-/**
- * Error representing any failure to fetch content.
- * Will contain the root cause exception as well as the requested URL.
- */
-class ContentFetchError(url: KrawlUrl, cause: Throwable):
-        Throwable("Failed to retrieve the content for ${url.canonicalForm}.", cause)

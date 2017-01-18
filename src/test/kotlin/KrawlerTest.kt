@@ -19,12 +19,14 @@
 import com.nhaarman.mockito_kotlin.*
 import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
 import io.thelandscape.krawler.crawler.KrawlConfig
-import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueEntry
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
 import io.thelandscape.krawler.crawler.Krawler
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestProviderIf
+import io.thelandscape.krawler.robots.RoboMinderIf
+import io.thelandscape.krawler.robots.RobotsConfig
 import org.junit.Before
 import org.junit.Test
 import java.util.concurrent.LinkedBlockingQueue
@@ -44,14 +46,16 @@ class KrawlerTest {
     val threadpool: ThreadPoolExecutor =
             ThreadPoolExecutor(4, 4, 1000L, TimeUnit.MILLISECONDS, LinkedBlockingQueue<Runnable>(), mockThreadFactory)
     val mockThreadpool = mock<ThreadPoolExecutor>()
+    val mockMinder = mock<RoboMinderIf>()
 
     val preparedResponse = KrawlDocument(exampleUrl, prepareResponse(200, ""))
 
     class testCrawler(x: KrawlConfig,
                       w: KrawlHistoryIf,
                       y: KrawlQueueIf,
+                      u: RobotsConfig?,
                       v: RequestProviderIf,
-                      z: ThreadPoolExecutor): Krawler(x, w, y, v, z) {
+                      z: ThreadPoolExecutor): Krawler(x, w, y, u, v, z) {
         override fun shouldVisit(url: KrawlUrl): Boolean {
             return true
         }
@@ -68,11 +72,12 @@ class KrawlerTest {
 
     }
 
-    val realThreadpoolTestKrawler = testCrawler(mockConfig, mockHistory, mockQueue, mockRequests, threadpool)
-    val mockThreadpoolTestKrawler = testCrawler(mockConfig, mockHistory, mockQueue, mockRequests, mockThreadpool)
+    val realThreadpoolTestKrawler = testCrawler(mockConfig, mockHistory, mockQueue, null, mockRequests, threadpool)
+    val mockThreadpoolTestKrawler = testCrawler(mockConfig, mockHistory, mockQueue, null, mockRequests, mockThreadpool)
 
     @Before fun setUp() {
         MockitoKotlin.registerInstanceCreator { KrawlUrl.new("") }
+        realThreadpoolTestKrawler.minder = mockMinder
     }
 
     /**
@@ -112,10 +117,14 @@ class KrawlerTest {
         whenever(mockHistory.hasBeenSeen(any())).thenReturn(false)
         // Make sure we get a request response
         whenever(mockRequests.getUrl(any())).thenReturn(preparedResponse)
+        // Make robo minder return true
+        whenever(mockMinder.isSafeToVisit(any())).thenReturn(true)
 
-        // Insert some stuff into the queue
+        // Get it started
         realThreadpoolTestKrawler.doCrawl(KrawlQueueEntry("http://www.test.com"))
 
+        // Verify that isSafeToVisit was called, minding robots.txt
+        verify(mockMinder).isSafeToVisit(KrawlUrl.Companion.new("http://www.test.com"))
         // Ensure we've called to verify this is a unique URL
         verify(mockHistory).hasBeenSeen(any())
         // Now verify that we insert the URL to the history

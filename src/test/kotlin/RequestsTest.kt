@@ -21,7 +21,6 @@ import com.nhaarman.mockito_kotlin.mock
 import com.nhaarman.mockito_kotlin.times
 import com.nhaarman.mockito_kotlin.verify
 import io.thelandscape.krawler.crawler.KrawlConfig
-import io.thelandscape.krawler.http.ContentFetchError
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestTracker
 import io.thelandscape.krawler.http.Requests
@@ -43,11 +42,7 @@ class RequestsTest {
     val testUrl2 = KrawlUrl.new("http://nothttpbin.org/1/")
 
     @Test fun testRequestCheck() {
-        try {
-            request.checkUrl(testUrl)
-        } catch (e: ContentFetchError) {
-            // Ignore this, it's expected
-        }
+        request.checkUrl(testUrl)
         // it should call execute once with an HttpHead
         // TODO: Swap the any() call to HttpHead somehow
         verify(mockHttpClient, times(1)).execute(any())
@@ -59,17 +54,9 @@ class RequestsTest {
         val numTimes = 10
         val start = Instant.now().toEpochMilli()
         (1 .. numTimes).forEach {
-            try {
-                request.getUrl(testUrl)
-            } catch (e: ContentFetchError) {
-                // Ignore this, it's expected
-            }
+            request.getUrl(testUrl)
             // Issue two requests
-            try {
-                request.getUrl(testUrl2)
-            } catch (e: ContentFetchError) {
-                // Ignore this, it's expected
-            }
+            request.getUrl(testUrl2)
         }
         threadpool.shutdown()
         while(!threadpool.isTerminated) {}

@@ -22,10 +22,13 @@ import io.thelandscape.krawler.HSQLConnection
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.History.KrawlHistoryHSQLDao
 import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
-import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
-import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueHSQLDao
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueEntry
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueHSQLDao
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
 import io.thelandscape.krawler.http.*
+import io.thelandscape.krawler.robots.RoboMinder
+import io.thelandscape.krawler.robots.RoboMinderIf
+import io.thelandscape.krawler.robots.RobotsConfig
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -44,6 +47,7 @@ import kotlin.concurrent.write
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                        private var krawlHistory: KrawlHistoryIf? = null,
                        private var krawlQueue: KrawlQueueIf? = null,
+                       val robotsConfig: RobotsConfig? = null,
                        private val requestProvider: RequestProviderIf = Requests(config),
                        private val threadpool: ThreadPoolExecutor = ThreadPoolExecutor(
                                config.numThreads,
@@ -70,6 +74,12 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         // Set the core threadpool threads to destroy themselves after config.emptyQueueWaitTime
         threadpool.allowCoreThreadTimeOut(true)
     }
+
+    /**
+     * Handle robots.txt
+     */
+    internal var minder: RoboMinderIf = RoboMinder(config.userAgent, requestProvider, robotsConfig ?: RobotsConfig())
+
 
     /**
      * Override this function to determine if a URL should be visited.
@@ -127,7 +137,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @param url KrawlUrl: The URL that failed
      * @param error ContentFetchError: The content fetch error that was thrown.
      */
-    open protected fun onContentFetchError(url: KrawlUrl, error: ContentFetchError) {
+    open protected fun onContentFetchError(url: KrawlUrl, reason: String) {
         return
     }
 
@@ -285,6 +295,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
 
         val krawlUrl: KrawlUrl = KrawlUrl.new(entry!!.url)
+
+        // If we're respecting robots.txt check if it's ok to visit this page
+        if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl))
+            return
+
         val depth: Int = entry.depth
 
         val parent: KrawlUrl = KrawlUrl.new(entry.parent.url)
@@ -309,8 +324,13 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
 
             // If there was an error on trying to get the doc, call content fetch error
-            if (doc is ErrorResponse || doc !is KrawlDocument) {
-                onContentFetchError(krawlUrl, ContentFetchError(krawlUrl, UnknownError()))
+            if (doc is ErrorResponse) {
+                onContentFetchError(krawlUrl, doc.reason)
+                return
+            }
+            // If there was an error parsing the response, still a content fetch error
+            if (doc !is KrawlDocument) {
+                onContentFetchError(krawlUrl, "Krawler was unable to parse the response from the server.")
                 return
             }
 
@@ -343,8 +363,14 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             val doc: RequestResponse = requestProvider.checkUrl(krawlUrl)
 
-            if (doc is ErrorResponse || doc !is KrawlDocument) {
-                onContentFetchError(krawlUrl, ContentFetchError(krawlUrl, UnknownError()))
+            // If the doc is an ErrorResponse or not a KrawlDocument call onContentFetchError
+            if (doc is ErrorResponse) {
+                onContentFetchError(krawlUrl, doc.reason)
+                return
+            }
+
+            if (doc !is KrawlDocument) {
+                onContentFetchError(krawlUrl, "Krawler was unable to parse the response from the server.")
                 return
             }
 

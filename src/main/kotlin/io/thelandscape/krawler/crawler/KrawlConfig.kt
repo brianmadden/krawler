@@ -48,9 +48,9 @@ class KrawlConfig(
         // Default: -1
         val socketTimeout: Int = -1,
         // Connect timeout in milliseconds until a connection is established. 0 = infinite, -1 = system default
-        val connectTimeout: Int = -1
-
-) {
+        val connectTimeout: Int = -1,
+        // Should we respect robots.txt
+        val respectRobotsTxt: Boolean = true) {
     // Length of time to sleep when queue becomes empty
     var emptyQueueWaitTime: Long = emptyQueueWaitTime
         private set(value) { field = if (value <= 0) 1 else value }
