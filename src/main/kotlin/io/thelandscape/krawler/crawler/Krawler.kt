@@ -30,7 +30,6 @@ import io.thelandscape.krawler.robots.RoboMinder
 import io.thelandscape.krawler.robots.RoboMinderIf
 import io.thelandscape.krawler.robots.RobotsConfig
 import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.RejectedExecutionHandler
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantReadWriteLock
@@ -55,7 +54,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                                config.numThreads,
                                config.emptyQueueWaitTime,
                                TimeUnit.SECONDS,
-                               LinkedBlockingQueue<Runnable>(config.maximumQueueSize), NoopTaskRejector())) {
+                               LinkedBlockingQueue<Runnable>(config.maximumQueueSize),
+                               NoopTaskRejector())) {
 
     init {
         if (krawlHistory == null || krawlQueue == null) {

@@ -27,7 +27,6 @@ poorly written websites, and thus less likely to error out during a crawl. The o
 still available to facilitate validation and checking though.
 * Krawler collects full anchor tags including all attributes and anchor text.
 * Krawler currently has no proxy support, but it is on the roadmap. :(
-* Krawler does not respect robots.txt so should be used with care. Be respectful! This feature is on the roadmap.
 
 Gradle
 ======
@@ -39,7 +38,7 @@ Krawler is published through jitpack.io at: https://jitpack.io/#brianmadden/kraw
         maven { url "https://jitpack.io" }
    }
    dependencies {
-         compile 'com.github.brianmadden:krawler:v0.1.0-beta.2'
+         compile 'com.github.brianmadden:krawler:0.2.0'
    }
 
 ```
@@ -76,5 +75,13 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
 Roadmap
 =======
-* Add support for collecting and respecting robots.txt
 * Proxy support
+
+Release Notes
+=============
+**0.2.0 (2017-1-18)** 
+
+- Krawler now respects robots.txt. This feature can be configured by passing a custom `RobotsConfig` 
+to your `Krawler` instance. By default Krawler will respect robots.txt without any additional configuration.
+- Krawler now collects outgoing links from `src` attributes of tags in addition to the `href` of anchor tags.
+- Minor bug fixes and refactorings.
