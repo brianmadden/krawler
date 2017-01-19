@@ -344,7 +344,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                             .filter { it.canonicalForm.isNotBlank() }
                             .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1) },
                     // Everything else (img tags, scripts, etc)d
-                    doc.otherOutgoingLinks.map { KrawlUrl.new(it, krawlUrl) }
+                    doc.otherOutgoingLinks
+                            .filterNot { it.startsWith("#")}
+                            .map { KrawlUrl.new(it, krawlUrl) }
                             .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1)}
             ).flatten()
 
