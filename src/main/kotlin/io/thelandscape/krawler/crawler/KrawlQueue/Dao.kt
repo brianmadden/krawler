@@ -59,6 +59,7 @@ class KrawlQueueHSQLDao(session: Session, private val histDao: KrawlHistoryHSQLD
                 "(url VARCHAR(2048) NOT NULL, parent INT, depth INT, timestamp TIMESTAMP)")
     }
 
+    private val syncLock = Any()
     override fun pop(): KrawlQueueEntry? {
         val historyEntry = Type(KrawlHistoryEntry::id, { histDao.findByIds(it) })
         val queueEntry = Type(
@@ -70,23 +71,16 @@ class KrawlQueueHSQLDao(session: Session, private val histDao: KrawlHistoryHSQLD
 
         fun <T> Collection<T>.fetch(node: Node) = fetcher.fetch(this, Node(node))
 
-        return pop(1).fetch(Node.all).firstOrNull()
-    }
-
-    private val syncLock = Any()
-    private fun pop(n: Int): List<KrawlQueueEntry> {
-
-        val selectSql = "SELECT TOP :n $columns FROM ${table.name}"
-        val params = mapOf("n" to n)
+        val selectSql = "SELECT TOP 1 $columns FROM ${table.name}"
         var out: List<KrawlQueueEntry> = listOf()
         // Synchronize this to prevent race conditions between popping and deleting
         synchronized(syncLock) {
-            out = session.select(selectSql, params, mapper = table.rowMapper())
+            out = session.select(selectSql, mapper = table.rowMapper())
             if (out.isNotEmpty())
-                session.update("DELETE FROM ${table.name} WHERE url IN (:ids)",
-                        mapOf("ids" to out.map { it.url }.joinToString(",")))
+                session.update("DELETE FROM ${table.name} WHERE url = :id", mapOf("id" to out.first().url))
         }
-        return out
+
+        return out.fetch(Node.all).firstOrNull()
     }
 
     override fun push(urls: List<KrawlQueueEntry>): List<KrawlQueueEntry> {

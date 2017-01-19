@@ -293,10 +293,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
         val krawlUrl: KrawlUrl = KrawlUrl.new(entry!!.url)
 
-        // If we're respecting robots.txt check if it's ok to visit this page
-        if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl))
-            return
-
         val depth: Int = entry.depth
 
         val parent: KrawlUrl = KrawlUrl.new(entry.parent.url)
@@ -316,6 +312,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
         // If we're supposed to visit this, get the HTML and call visit
         if (shouldVisit(krawlUrl)) {
+
+            // If we're respecting robots.txt check if it's ok to visit this page
+            if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl))
+                return
+
             visitCount++ // This will also set continueCrawling to false if the totalPages has been hit
 
             val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
