@@ -56,19 +56,36 @@ The full code for this simple example can also be found in the [example project]
 class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
     private val FILTERS: Regex = Regex(".*(\\.(css|js|bmp|gif|jpe?g|png|tiff?|mid|mp2|mp3|mp4|wav|avi|" +
-            "mov|mpeg|ram|m4v|pdf|rm|smil|wmv|swf|wma|zip|rar|gz|tar|ico))$")
+            "mov|mpeg|ram|m4v|pdf|rm|smil|wmv|swf|wma|zip|rar|gz|tar|ico))$", RegexOption.IGNORE_CASE)
 
     override fun shouldVisit(url: KrawlUrl): Boolean {
         val withoutGetParams: String = url.canonicalForm.split("?").first()
         return (!FILTERS.matches(withoutGetParams) && url.host == "en.wikipedia.org")
     }
 
+
+    private val counterLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
+    private var counter: Int = 0
+        get() = counterLock.read { field }
+        set(value) = counterLock.write { field = value}
+
     override fun visit(url: KrawlUrl, doc: KrawlDocument) {
-        println("${this.visitCount}. Crawling ${url.canonicalForm}")
+        println("${++counter}. Crawling ${url.canonicalForm}")
     }
 
+    override fun onContentFetchError(url: KrawlUrl, reason: String) {
+        println("${++counter}. Tried to crawl ${url.canonicalForm} but failed to read the content.")
+    }
+
+    private var startTimestamp: Long = 0
+    private var endTimestamp: Long = 0
+
+    override fun onCrawlStart() {
+        startTimestamp = LocalTime.now().toNanoOfDay()
+    }
     override fun onCrawlEnd() {
-        println("Crawled $visitCount pages.")
+        endTimestamp = LocalTime.now().toNanoOfDay()
+        println("Crawled $counter pages in ${(endTimestamp - startTimestamp) / 1000000000.0} seconds.")
     }
 }
 ```
