@@ -37,8 +37,9 @@ class KrawlConfig(
         val crawlDirectory: String = ".krawl",
         // Should the Krawl progress persist?
         val persistentCrawl: Boolean = false,
-        // Maximum number of queued URLs
-        val maximumQueueSize: Int = 50000,
+        // Maximum number of queued URLs - when this value is exceeded
+        // additional crawl requests are rejected until the queue has drained
+        val maximumQueueSize: Int = 1000000,
         // Length of time (in seconds) to wait before giving up and calling it quits
         emptyQueueWaitTime: Long = 10,
         // The timeout in milliseconds used when requesting a connection. 0 = infinite, -1 = system default

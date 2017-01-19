@@ -30,6 +30,7 @@ import io.thelandscape.krawler.robots.RoboMinder
 import io.thelandscape.krawler.robots.RoboMinderIf
 import io.thelandscape.krawler.robots.RobotsConfig
 import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.RejectedExecutionHandler
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantReadWriteLock
@@ -54,7 +55,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                                config.numThreads,
                                config.emptyQueueWaitTime,
                                TimeUnit.SECONDS,
-                               LinkedBlockingQueue<Runnable>(config.maximumQueueSize))) {
+                               LinkedBlockingQueue<Runnable>(config.maximumQueueSize), NoopTaskRejector())) {
 
     init {
         if (krawlHistory == null || krawlQueue == null) {
@@ -274,7 +275,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             // Wait for the configured period for more URLs
             while (emptyQueueWaitCount < config.emptyQueueWaitTime) {
-                Thread.sleep(100)
+                Thread.sleep(1000)
                 emptyQueueWaitCount++
 
                 // Try to pop again
@@ -326,6 +327,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 onContentFetchError(krawlUrl, doc.reason)
                 return
             }
+
             // If there was an error parsing the response, still a content fetch error
             if (doc !is KrawlDocument) {
                 onContentFetchError(krawlUrl, "Krawler was unable to parse the response from the server.")
@@ -362,6 +364,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
         // If we're supposed to check this, get the status code and call check
         if (shouldCheck(krawlUrl)) {
+
+            // If we're respecting robots.txt check if it's ok to visit this page
+            if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl))
+                return
+
             // Increment the check count
             visitCount++
 

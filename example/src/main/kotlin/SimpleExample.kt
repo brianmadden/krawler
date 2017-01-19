@@ -37,12 +37,16 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
 
     private val counterLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
-    private var counter: Int = 1
+    private var counter: Int = 0
         get() = counterLock.read { field }
         set(value) = counterLock.write { field = value}
 
     override fun visit(url: KrawlUrl, doc: KrawlDocument) {
-        println("${counter++}. Crawling ${url.canonicalForm}")
+        println("${++counter}. Crawling ${url.canonicalForm}")
+    }
+
+    override fun onContentFetchError(url: KrawlUrl, reason: String) {
+        println("${++counter}. Tried to crawl ${url.canonicalForm} but failed to read the content.")
     }
 
     private var startTimestamp: Long = 0
@@ -53,6 +57,6 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
     }
     override fun onCrawlEnd() {
         endTimestamp = LocalTime.now().toNanoOfDay()
-        println("Crawled $visitCount pages in ${(endTimestamp - startTimestamp) / 1000000000.0} seconds.")
+        println("Crawled $counter pages in ${(endTimestamp - startTimestamp) / 1000000000.0} seconds.")
     }
 }
