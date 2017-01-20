@@ -36,9 +36,9 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
             return KrawlUrl(url, parent)
         }
 
-        fun new(anchor: Element, parent: KrawlUrl? = null): KrawlUrl? {
+        fun new(anchor: Element, parent: KrawlUrl? = null): KrawlUrl {
             if (anchor.tagName() != "a" && !anchor.hasAttr("href"))
-                return null
+                return KrawlUrl("", parent)
             return KrawlUrl(anchor, parent)
         }
     }

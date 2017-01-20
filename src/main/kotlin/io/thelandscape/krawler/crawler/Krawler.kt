@@ -340,7 +340,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                     doc.anchorTags
                             .filterNot { it.attr("href").startsWith("#") }
                             .map { KrawlUrl.new(it, krawlUrl) }
-                            .filterNotNull()
                             .filter { it.canonicalForm.isNotBlank() }
                             .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1) },
                     // Everything else (img tags, scripts, etc)d
