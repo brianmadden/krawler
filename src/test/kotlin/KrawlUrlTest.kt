@@ -111,17 +111,8 @@ class KrawlUrlTest {
         // it should have a canonical form that is normalized
         assertEquals("http://www.xyz.abc.com/~zyxzzy/abc%3A", testUrl.canonicalForm)
 
-        // It should have a canonical form that adds a slash if the URL ends with the domain suffix
-        //val testAddSlash = KrawlUrl.new("http://www.xyz.com")
-        //assertEquals("http://www.xyz.com/", testAddSlash.canonicalForm)
-
-        // It should have a canonical form that does not add a slash if it is already present
-        //val testNoAddDoubleSlash = KrawlUrl.new("http://www.xyz.com/")
-        //assertEquals("http://www.xyz.com/", testNoAddDoubleSlash.canonicalForm)
-
-        // It should have a canonical form that does not add a slash if the URL does not end with the domain suffix
-        //val testNoAddSlash = KrawlUrl.new("http://www.xyz.com/index.html")
-        //assertEquals("http://www.xyz.com/index.html", testNoAddSlash.canonicalForm)
+        // Anchor test url should be unchanged since rel=canonical
+        assertEquals("http://www.google.com/./zxyzzy", anchorTestUrl!!.canonicalForm)
     }
 
     // it should have no /./ in normalized form
@@ -136,9 +127,7 @@ class KrawlUrlTest {
         assertFalse(testUrl.normalForm.contains("///..//"))
     }
 
-    @Test fun testScheme() {
-        assertEquals("http", testUrl.scheme)
-    }
+    @Test fun testScheme() = assertEquals("http", testUrl.scheme)
 
     @Test fun testSuffix() = assertEquals("com", testUrl.suffix)
 

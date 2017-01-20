@@ -282,8 +282,11 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
     // TODO: Decide to add or remove / at end of URL -- this may change semantics on some web servers
     // if (normalForm.endsWith(suffix)) normalForm + "/" else normalForm
     // TODO: Remove ? if no query parameters follow
-    // TODO: Remove duplicate / other than after scheme portion
-    val canonicalForm: String = normalForm
+    // TODO: Remove duplicate / after scheme portion
+    val canonicalForm: String
+        get() = if (anchorAttributes != null &&
+                anchorAttributes!!.contains("rel") &&
+                anchorAttributes!!["rel"] == "canonical") rawUrl else normalForm
 
     override fun toString(): String = canonicalForm
 
