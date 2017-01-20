@@ -112,7 +112,7 @@ class KrawlUrlTest {
         assertEquals("http://www.xyz.abc.com/~zyxzzy/abc%3A", testUrl.canonicalForm)
 
         // Anchor test url should be unchanged since rel=canonical
-        assertEquals("http://www.google.com/./zxyzzy", anchorTestUrl!!.canonicalForm)
+        assertEquals("http://www.google.com/./zxyzzy", anchorTestUrl.canonicalForm)
     }
 
     // it should have no /./ in normalized form
@@ -145,7 +145,7 @@ class KrawlUrlTest {
         // The anchorTestUrl was from an anchor tag
 
         // It was extracted from an anchor
-        assertTrue(anchorTestUrl!!.wasExtractedFromAnchor)
+        assertTrue(anchorTestUrl.wasExtractedFromAnchor)
         // It should have text associated with the anchor text
         assertEquals("Anchor Text", anchorTestUrl.anchorText)
         // It should have attributes

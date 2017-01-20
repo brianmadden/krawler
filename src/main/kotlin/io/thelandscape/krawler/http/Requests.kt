@@ -131,7 +131,7 @@ class Requests(private val krawlConfig: KrawlConfig,
             val response: HttpResponse? = httpClient!!.execute(req)
             if (response == null) ErrorResponse(url) else retFun(url, response)
         } catch (e: Exception) {
-            ErrorResponse(url, e.toString() ?: "An unknown error has occurred.")
+            ErrorResponse(url, e.toString())
         }
 
         return resp
