@@ -38,7 +38,7 @@ Krawler is published through jitpack.io at: https://jitpack.io/#brianmadden/kraw
         maven { url "https://jitpack.io" }
    }
    dependencies {
-         compile 'com.github.brianmadden:krawler:0.2.0'
+         compile 'com.github.brianmadden:krawler:0.2.1'
    }
 
 ```
@@ -96,6 +96,18 @@ Roadmap
 
 Release Notes
 =============
+**0.2.1 (2017-1-20)**
+- Redirect handling has been changed. Redirects can be followed or not via configuration
+option in `KrawlConfig`. When redirects are enabled the redirected to URL will be added 
+to the queue as a part of the link harvesting phase of Krawler.
+
+- If an anchor tag specifies `rel='canonical'` the `canonicalForm` will not be subject
+to further processing.
+
+-`KrawlUrl.new`'s implementation has been changed to prevent `null` from being returned
+in certain circumstances.
+
+
 **0.2.0 (2017-1-18)** 
 
 - Krawler now respects robots.txt. This feature can be configured by passing a custom `RobotsConfig` 
