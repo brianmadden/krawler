@@ -314,7 +314,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 return
             }
 
-            val links = harvestLinks(krawlUrl, doc, history, depth)
+            val links = harvestLinks(doc, krawlUrl, history, depth)
 
             // Add the URLs to the queue
             addUrlToQueue(links)
@@ -371,7 +371,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     /**
      * Harvests all of the links from a KrawlQueueDocument and creates KrawlQueueEntries from them.
      */
-    internal fun harvestLinks(url: KrawlUrl, doc: KrawlDocument,
+    internal fun harvestLinks(doc: KrawlDocument, url: KrawlUrl,
                               history: KrawlHistoryEntry, depth: Int): List<KrawlQueueEntry> {
 
         // Handle redirects by getting the location tag of the header and pushing that into the queue
@@ -379,6 +379,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             // Queue the redirected URL
             val locStr: String = doc.headers["location"] ?: return listOf()
             val location: KrawlUrl = KrawlUrl.new(locStr, url)
+            // Decrement visit count since a redirect is sort of a continuation rather than a new page
+            // TODO: Is this the behavior we want?
+            visitCount--
             return listOf(KrawlQueueEntry(location.canonicalForm, history, depth))
         }
 
@@ -387,7 +390,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 // Anchor tags
                 doc.anchorTags
                         .filterNot { it.attr("href").startsWith("#") }
-                        .map { KrawlUrl.new(it, url) }
+                        .map { KrawlUrl.new(it.attr("href"), url) }
                         .filter { it.canonicalForm.isNotBlank() }
                         .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1) },
                 // Everything else (img tags, scripts, etc)d
