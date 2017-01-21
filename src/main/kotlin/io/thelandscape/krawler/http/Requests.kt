@@ -26,9 +26,13 @@ import org.apache.http.client.config.RequestConfig
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.client.methods.HttpHead
 import org.apache.http.client.methods.HttpUriRequest
+import org.apache.http.conn.ssl.NoopHostnameVerifier
+import org.apache.http.conn.ssl.TrustStrategy
 import org.apache.http.impl.client.CloseableHttpClient
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
+import org.apache.http.ssl.SSLContextBuilder
+import java.security.cert.X509Certificate
 import java.time.Instant
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
@@ -68,8 +72,16 @@ class Requests(private val krawlConfig: KrawlConfig,
                     .setSocketTimeout(krawlConfig.socketTimeout)
                     .build()
 
+            val trustStrat = TrustStrategy { arrayOfX509Certificates: Array<X509Certificate>, s: String -> true }
+
+            val sslContext = SSLContextBuilder.create()
+                    .loadTrustMaterial(null, trustStrat)
+                    .build()
+
             httpClient = HttpClients.custom()
                     .setDefaultRequestConfig(requestConfig)
+                    .setSSLContext(sslContext)
+                    .setSSLHostnameVerifier(NoopHostnameVerifier())
                     .setUserAgent(krawlConfig.userAgent)
                     .setConnectionManager(pcm).build()
         }

@@ -105,7 +105,7 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
 
             // Handle isAbsolute and finding the scheme
             if (c == ':') {
-                if (!firstColonFound) {
+                if (!nonHostSlashSeen && !firstColonFound) {
                     firstColonFound = true
 
                     // If the first colon was found the scheme is everything up until then
@@ -114,7 +114,11 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
                     val slice = url.slice(0 until idx).toLowerCase()
                     // NOTE: Right now we're ignoring any scheme that isn't http or https since we're only crawling
                     // websites. This isn't *technically* correct, but neither are a lot of URLs we find :-/
-                    scheme = if (validator.matches(slice) && (slice == "http" || slice == "https")) slice else scheme
+                    if (validator.matches(slice) && (slice == "http" || slice == "https"))
+                        scheme = slice
+                    else
+                        break
+
 
                     if (url.getOrNull(idx + 1) == '/' && url.getOrNull(idx + 2) == '/') {
                         isAbsolute = true

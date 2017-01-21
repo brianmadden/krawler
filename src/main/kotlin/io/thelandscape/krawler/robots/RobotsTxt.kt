@@ -25,6 +25,8 @@ import org.apache.http.util.EntityUtils
 
 class RobotsTxt(url: KrawlUrl, response: HttpResponse) : RequestResponse {
 
+    // TODO: Improve handling: https://en.wikipedia.org/wiki/Robots_exclusion_standard#About_the_standard
+
     var disallowRules: Map<String, MutableSet<String>> = mapOf()
         private set
 
