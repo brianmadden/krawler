@@ -43,8 +43,9 @@ class KrawlHistoryDaoTest {
                 "(id INT IDENTITY, url VARCHAR(255), timestamp TIMESTAMP)")
 
         val ins = KrawlUrl.new("http://www.test.com")
-        val ret = krawlHistoryDao.insert(ins)
-
+        val ins2 = KrawlUrl.new("http://www.test2.com")
+        krawlHistoryDao.insert(ins)
+        krawlHistoryDao.insert(ins2)
     }
 
     @Test fun testInsert() {
@@ -52,14 +53,14 @@ class KrawlHistoryDaoTest {
         val ins = KrawlUrl.new("http://www.test2.com")
         val ret = krawlHistoryDao.insert(ins)
 
-        // The ID should be 1 since the insert in setUp should be 0
-        assertEquals(1, ret.id)
+        // The ID should be 2 since the inserts in setUp should be 1 & 2
+        assertEquals(2, ret.id)
     }
 
     @Test fun testClearHistory() {
         val cleared = krawlHistoryDao.clearHistory()
 
-        assertTrue { cleared >= 1}
+        assertTrue { cleared >= 1 }
     }
 
     @Test fun testHasBeenSeen() {

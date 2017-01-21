@@ -17,6 +17,7 @@
  */
 
 import com.nhaarman.mockito_kotlin.*
+import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
 import io.thelandscape.krawler.crawler.KrawlConfig
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueEntry
@@ -115,6 +116,7 @@ class KrawlerTest {
     @Test fun testDoCrawl() {
         // Make the hasBeenSeen return true
         whenever(mockHistory.hasBeenSeen(any())).thenReturn(false)
+        whenever(mockHistory.insert(any())).thenReturn(KrawlHistoryEntry())
         // Make sure we get a request response
         whenever(mockRequests.getUrl(any())).thenReturn(preparedResponse)
         // Make robo minder return true

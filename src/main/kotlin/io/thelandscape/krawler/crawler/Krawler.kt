@@ -264,43 +264,21 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             }
         }
 
-    internal fun doCrawl(entry: KrawlQueueEntry? = krawlQueue!!.pop()) {
+    // Set of redirect codes
+    private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
+
+    internal fun doCrawl(queuedEntry: KrawlQueueEntry? = krawlQueue!!.pop()) {
         // If we're done, we're done
         if(!continueCrawling) return
 
-        var emptyQueueWaitCount: Long = 0
-        // Pop a URL off the queue
-        var entry: KrawlQueueEntry? = entry
-        if (entry == null) {
+        val entry: KrawlQueueEntry = waitForUrl(queuedEntry) ?: return
 
-            // Wait for the configured period for more URLs
-            while (emptyQueueWaitCount < config.emptyQueueWaitTime) {
-                Thread.sleep(1000)
-                emptyQueueWaitCount++
-
-                // Try to pop again
-                entry = krawlQueue!!.pop()
-
-                // If we have something, reset the count and move on
-                if (entry != null) {
-                    break
-                }
-
-                // If we've hit the limit, time to quit
-                if (emptyQueueWaitCount == config.emptyQueueWaitTime)
-                    return
-            }
-        }
-
-        val krawlUrl: KrawlUrl = KrawlUrl.new(entry!!.url)
-
+        val krawlUrl: KrawlUrl = KrawlUrl.new(entry.url)
         val depth: Int = entry.depth
-
         val parent: KrawlUrl = KrawlUrl.new(entry.parent.url)
 
         // Make sure we're within depth limit
-        val maxDepth: Int = config.maxDepth
-        if (depth >= maxDepth && maxDepth != -1)
+        if (depth >= config.maxDepth && config.maxDepth != -1)
             return
 
         val history: KrawlHistoryEntry =
@@ -312,7 +290,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 }
 
         // If we're supposed to visit this, get the HTML and call visit
-        if (shouldVisit(krawlUrl)) {
+        val visit = shouldVisit(krawlUrl)
+        val check = shouldCheck(krawlUrl)
+        if (visit || check) {
 
             // If we're respecting robots.txt check if it's ok to visit this page
             if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl))
@@ -334,61 +314,87 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 return
             }
 
-            // Parse out the URLs and construct queue entries from them
-            val links: List<KrawlQueueEntry> = listOf(
-                    // Anchor tags
-                    doc.anchorTags
-                            .filterNot { it.attr("href").startsWith("#") }
-                            .map { KrawlUrl.new(it, krawlUrl) }
-                            .filter { it.canonicalForm.isNotBlank() }
-                            .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1) },
-                    // Everything else (img tags, scripts, etc)d
-                    doc.otherOutgoingLinks
-                            .filterNot { it.startsWith("#")}
-                            .map { KrawlUrl.new(it, krawlUrl) }
-                            .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1)}
-            ).flatten()
+            val links = harvestLinks(krawlUrl, doc, history, depth)
 
-            // Insert the URLs to the queue now
-            if (config.persistentCrawl) {
-                // Only in the persistent crawl case do we actually want to use the KrawlQueue
-                krawlQueue!!.push(links)
-                links.forEach { threadpool.submit { doCrawl() } }
-            } else {
-                // Skipping the HSQL backed queue saves us some time
-                links.forEach { threadpool.submit { doCrawl(it) } }
-            }
+            // Add the URLs to the queue
+            addUrlToQueue(links)
 
             // Finally call visit
-            visit(krawlUrl, doc)
+            if (visit)
+                visit(krawlUrl, doc)
+
+            if (check)
+                check(krawlUrl, doc.statusCode)
+        }
+    }
+
+    /**
+     * Method attempts to pop a KrawlQueueEntry from the queue once per second for up to krawlConfig.emptyQueueWaitTime
+     *
+     * @param entry KrawlQueueEntry?: The starting entry, if this value is null the wait will happen, otherwise it's
+     * simply returned as is.
+     *
+     * @return [KrawlQueueEntry]?: A KrawlQueueEntry, or null if nothing could be popped from the queue
+     */
+    internal fun waitForUrl(queuedEntry: KrawlQueueEntry?): KrawlQueueEntry? {
+        var emptyQueueWaitCount: Long = 0
+        // Pop a URL off the queue
+        var entry: KrawlQueueEntry? = queuedEntry
+
+        while (entry == null && emptyQueueWaitCount < config.emptyQueueWaitTime) {
+            // Wait for the configured period for more URLs
+            Thread.sleep(1000)
+            emptyQueueWaitCount++
+
+            // Try to pop again
+            entry = krawlQueue!!.pop()
         }
 
-        // If we're supposed to check this, get the status code and call check
-        if (shouldCheck(krawlUrl)) {
+        return entry
+    }
 
-            // If we're respecting robots.txt check if it's ok to visit this page
-            if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl))
-                return
-
-            // Increment the check count
-            visitCount++
-
-            val doc: RequestResponse = requestProvider.checkUrl(krawlUrl)
-
-            // If the doc is an ErrorResponse or not a KrawlDocument call onContentFetchError
-            if (doc is ErrorResponse) {
-                onContentFetchError(krawlUrl, doc.reason)
-                return
-            }
-
-            if (doc !is KrawlDocument) {
-                onContentFetchError(krawlUrl, "Krawler was unable to parse the response from the server.")
-                return
-            }
-
-            val code: Int = doc.statusCode
-
-            check(krawlUrl, code)
+    /**
+     * Logic to add a URL to the queue
+     */
+    internal fun addUrlToQueue(links: List<KrawlQueueEntry>) {
+        // Insert the URLs to the queue now
+        if (config.persistentCrawl) {
+            // Only in the persistent crawl case do we actually want to use the KrawlQueue
+            krawlQueue!!.push(links)
+            links.forEach { threadpool.submit { doCrawl() } }
+        } else {
+            // Skipping the HSQL backed queue saves us some time
+            links.forEach { threadpool.submit { doCrawl(it) } }
         }
+    }
+
+    /**
+     * Harvests all of the links from a KrawlQueueDocument and creates KrawlQueueEntries from them.
+     */
+    internal fun harvestLinks(url: KrawlUrl, doc: KrawlDocument,
+                              history: KrawlHistoryEntry, depth: Int): List<KrawlQueueEntry> {
+
+        // Handle redirects by getting the location tag of the header and pushing that into the queue
+        if (doc.statusCode in redirectCodes && config.followRedirects) {
+            // Queue the redirected URL
+            val locStr: String = doc.headers["location"] ?: return listOf()
+            val location: KrawlUrl = KrawlUrl.new(locStr, url)
+            return listOf(KrawlQueueEntry(location.canonicalForm, history, depth))
+        }
+
+        // If it wasn't a redirect  parse out the URLs from anchor tags and construct queue entries from them
+        return listOf(
+                // Anchor tags
+                doc.anchorTags
+                        .filterNot { it.attr("href").startsWith("#") }
+                        .map { KrawlUrl.new(it, url) }
+                        .filter { it.canonicalForm.isNotBlank() }
+                        .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1) },
+                // Everything else (img tags, scripts, etc)d
+                doc.otherOutgoingLinks
+                        .filterNot { it.startsWith("#")}
+                        .map { KrawlUrl.new(it, url) }
+                        .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1)}
+        ).flatten()
     }
 }

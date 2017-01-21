@@ -46,7 +46,7 @@ class KrawlDocument(val url: KrawlUrl, response: HttpResponse) : RequestResponse
     /**
      * Http headers
      */
-    val headers: Map<String, String> = response.allHeaders.associate { it.name to it.value }
+    val headers: Map<String, String> = response.allHeaders.associate { it.name.toLowerCase() to it.value }
 
     /**
      * Raw HTML

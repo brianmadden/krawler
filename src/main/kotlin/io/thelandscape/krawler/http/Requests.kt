@@ -62,7 +62,7 @@ class Requests(private val krawlConfig: KrawlConfig,
                     .setCookieSpec(CookieSpecs.STANDARD)
                     .setExpectContinueEnabled(false)
                     .setContentCompressionEnabled(krawlConfig.allowContentCompression)
-                    .setRedirectsEnabled(krawlConfig.followRedirects)
+                    .setRedirectsEnabled(false)  // Redirects are handled explicitly during doCrawl
                     .setConnectionRequestTimeout(krawlConfig.connectionRequestTimeout)
                     .setConnectTimeout(krawlConfig.connectTimeout)
                     .setSocketTimeout(krawlConfig.socketTimeout)
