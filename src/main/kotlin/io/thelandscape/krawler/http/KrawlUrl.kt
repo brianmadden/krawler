@@ -54,8 +54,7 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
         private set
 
     // Constructor used when we pass a full anchor tag in
-    private constructor(anchor: Element, parent: KrawlUrl?):
-            this(anchor.attr("href"), parent) {
+    private constructor(anchor: Element, parent: KrawlUrl?): this(anchor.attr("href"), parent) {
 
         wasExtractedFromAnchor = true
         anchorText = anchor.text() ?: ""
