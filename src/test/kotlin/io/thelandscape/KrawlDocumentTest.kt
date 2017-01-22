@@ -1,3 +1,5 @@
+package io.thelandscape
+
 /**
  * Created by brian.a.madden@gmail.com on 10/26/16.
  *
@@ -16,15 +18,19 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import com.nhaarman.mockito_kotlin.mock
+import com.nhaarman.mockito_kotlin.whenever
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
+import io.thelandscape.krawler.http.RedirectHistoryNode
 import org.apache.http.HttpResponse
 import org.apache.http.ProtocolVersion
+import org.apache.http.client.protocol.HttpClientContext
 import org.apache.http.entity.StringEntity
 import org.apache.http.message.BasicHttpResponse
 import org.apache.http.message.BasicStatusLine
+import org.junit.Before
 import org.junit.Test
-import org.w3c.dom.NodeList
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -48,15 +54,24 @@ private val mockReturn = prepareResponse(200, "<html><head><title>ABC</title></h
 
 private val mockEmptyReturn = prepareResponse(200, "")
 private val mock404Return = prepareResponse(404, "<html><body>404 Not Found!</body></html>")
+private val mockContext = HttpClientContext()
 
-private val parent: KrawlUrl = KrawlUrl.new("http://www.parent.com/")
+private val parent: KrawlUrl = KrawlUrl.new("http://www.io.thelandscape.parent.com/")
 
 class CrawlDocumentTest {
 
-    val url: KrawlUrl = KrawlUrl.Companion.new("http://www.example.org")
-    val doc: KrawlDocument = KrawlDocument(url, mockReturn)
-    val emptyDoc: KrawlDocument = KrawlDocument(url, mockEmptyReturn, parent)
-    val four04Doc: KrawlDocument = KrawlDocument(url, mock404Return)
+    val url: KrawlUrl = KrawlUrl.new("http://www.example.org")
+    val doc: KrawlDocument = KrawlDocument(url, mockReturn, mockContext)
+    val emptyDoc: KrawlDocument = KrawlDocument(url, mockEmptyReturn, mockContext, parent)
+    val four04Doc: KrawlDocument = KrawlDocument(url, mock404Return, mockContext)
+
+    @Before fun setUp() {
+        mockContext.setAttribute("fullRedirectHistory", listOf<RedirectHistoryNode>())
+    }
+
+    @Test fun testRedirectsHistory() {
+        assertTrue { doc.redirectHistory.isEmpty() }
+    }
 
     // All docs should have a headers property
     @Test fun testHeadersProperty() {

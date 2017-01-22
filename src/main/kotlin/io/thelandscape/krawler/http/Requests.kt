@@ -20,17 +20,22 @@ package io.thelandscape.krawler.http
 
 import io.thelandscape.krawler.crawler.KrawlConfig
 import io.thelandscape.krawler.robots.RobotsTxt
+import org.apache.http.HttpRequest
 import org.apache.http.HttpResponse
 import org.apache.http.client.config.CookieSpecs
 import org.apache.http.client.config.RequestConfig
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.client.methods.HttpHead
 import org.apache.http.client.methods.HttpUriRequest
+import org.apache.http.client.protocol.HttpClientContext
 import org.apache.http.conn.ssl.NoopHostnameVerifier
 import org.apache.http.conn.ssl.TrustStrategy
 import org.apache.http.impl.client.CloseableHttpClient
+import org.apache.http.impl.client.DefaultRedirectStrategy
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
+import org.apache.http.protocol.BasicHttpContext
+import org.apache.http.protocol.HttpContext
 import org.apache.http.ssl.SSLContextBuilder
 import java.security.cert.X509Certificate
 import java.time.Instant
@@ -55,6 +60,23 @@ interface RequestProviderIf {
     fun fetchRobotsTxt(url: KrawlUrl): RequestResponse
 }
 
+internal class HistoryTrackingRedirectStrategy: DefaultRedirectStrategy() {
+    override fun getRedirect(request: HttpRequest, response: HttpResponse,
+                             context: HttpContext): HttpUriRequest {
+
+        val newRequest = super.getRedirect(request, response, context)
+
+        val node: RedirectHistoryNode = RedirectHistoryNode(request.requestLine.uri, response.statusLine.statusCode,
+                newRequest.uri.toASCIIString())
+
+        val redirectHistory: List<RedirectHistoryNode> =
+                context.getAttribute("fullRedirectHistory") as List<RedirectHistoryNode>? ?: listOf<RedirectHistoryNode>()
+        context.setAttribute("fullRedirectHistory", redirectHistory + listOf(node))
+
+        return newRequest
+    }
+}
+
 private val pcm: PoolingHttpClientConnectionManager = PoolingHttpClientConnectionManager()
 
 class Requests(private val krawlConfig: KrawlConfig,
@@ -66,7 +88,7 @@ class Requests(private val krawlConfig: KrawlConfig,
                     .setCookieSpec(CookieSpecs.STANDARD)
                     .setExpectContinueEnabled(false)
                     .setContentCompressionEnabled(krawlConfig.allowContentCompression)
-                    .setRedirectsEnabled(false)  // Redirects are handled explicitly during doCrawl
+                    .setRedirectsEnabled(krawlConfig.followRedirects && krawlConfig.useFastRedirectStrategy)
                     .setConnectionRequestTimeout(krawlConfig.connectionRequestTimeout)
                     .setConnectTimeout(krawlConfig.connectTimeout)
                     .setSocketTimeout(krawlConfig.socketTimeout)
@@ -78,12 +100,16 @@ class Requests(private val krawlConfig: KrawlConfig,
                     .loadTrustMaterial(null, trustStrat)
                     .build()
 
+            val redirectStrategy = HistoryTrackingRedirectStrategy()
+
             httpClient = HttpClients.custom()
                     .setDefaultRequestConfig(requestConfig)
                     .setSSLContext(sslContext)
                     .setSSLHostnameVerifier(NoopHostnameVerifier())
+                    .setRedirectStrategy(redirectStrategy)
                     .setUserAgent(krawlConfig.userAgent)
-                    .setConnectionManager(pcm).build()
+                    .setConnectionManager(pcm)
+                    .build()
         }
     }
 
@@ -121,7 +147,10 @@ class Requests(private val krawlConfig: KrawlConfig,
      */
     private fun makeRequest(url: KrawlUrl,
                             reqFun: (String) -> HttpUriRequest,
-                            retFun: (KrawlUrl, HttpResponse) -> RequestResponse): RequestResponse {
+                            retFun: (KrawlUrl, HttpResponse, HttpClientContext) -> RequestResponse): RequestResponse {
+
+        val httpContext = HttpClientContext()
+        httpContext.setAttribute("fullRedirectHistory", listOf<RedirectHistoryNode>())
 
         val req: HttpUriRequest = reqFun(url.canonicalForm)
         val host: String = url.host
@@ -140,8 +169,8 @@ class Requests(private val krawlConfig: KrawlConfig,
         }
 
         val resp: RequestResponse = try {
-            val response: HttpResponse? = httpClient!!.execute(req)
-            if (response == null) ErrorResponse(url) else retFun(url, response)
+            val response: HttpResponse? = httpClient!!.execute(req, httpContext)
+            if (response == null) ErrorResponse(url) else retFun(url, response, httpContext)
         } catch (e: Exception) {
             ErrorResponse(url, e.toString())
         }

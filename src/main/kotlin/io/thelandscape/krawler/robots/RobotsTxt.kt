@@ -21,9 +21,10 @@ package io.thelandscape.krawler.robots
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestResponse
 import org.apache.http.HttpResponse
+import org.apache.http.client.protocol.HttpClientContext
 import org.apache.http.util.EntityUtils
 
-class RobotsTxt(url: KrawlUrl, response: HttpResponse) : RequestResponse {
+class RobotsTxt(url: KrawlUrl, response: HttpResponse, context: HttpClientContext) : RequestResponse {
 
     // TODO: Improve handling: https://en.wikipedia.org/wiki/Robots_exclusion_standard#About_the_standard
 

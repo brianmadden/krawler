@@ -54,6 +54,9 @@ class KrawlConfig(
         val respectRobotsTxt: Boolean = true,
         // Should we follow redirects
         val followRedirects: Boolean = true,
+        // Use fast redirect strategy, or slow
+        // Slow redirect strategy inserts the target URL of the redirect back to the queue rather than auto following
+        val useFastRedirectStrategy: Boolean = true,
         // Should we use content compression
         val allowContentCompression: Boolean = true) {
     // Length of time to sleep when queue becomes empty

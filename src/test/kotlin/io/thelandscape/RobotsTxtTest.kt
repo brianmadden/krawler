@@ -1,3 +1,5 @@
+package io.thelandscape
+
 /**
  * Created by brian.a.madden@gmail.com on 1/15/17.
  *
@@ -16,21 +18,24 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import com.nhaarman.mockito_kotlin.mock
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.robots.RobotsTxt
+import org.apache.http.client.protocol.HttpClientContext
 import org.junit.Test
 import kotlin.test.assertEquals
 
+private val mockContext = mock<HttpClientContext>()
 val nullUrl = KrawlUrl.new("")
-val disallowAll: RobotsTxt = RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: * \n Disallow: / "))
+val disallowAll: RobotsTxt = RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: * \n Disallow: / "), mockContext)
 val disallowMe: RobotsTxt =
-        RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: AGENT-A \n Disallow: / \n User-Agent: * \n Disallow: "))
+        RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: AGENT-A \n Disallow: / \n User-Agent: * \n Disallow: "), mockContext)
 val allowMe: RobotsTxt =
-        RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: AGENT-A \n Disallow: \n User-Agent: * \n Disallow: /"))
-val allowAll: RobotsTxt = RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: * \n Disallow: "))
-val unrelatedResponse: RobotsTxt = RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: Google \n Disallow: /"))
+        RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: AGENT-A \n Disallow: \n User-Agent: * \n Disallow: /"), mockContext)
+val allowAll: RobotsTxt = RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: * \n Disallow: "), mockContext)
+val unrelatedResponse: RobotsTxt = RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: Google \n Disallow: /"), mockContext)
 val specificAgentSpecificPage: RobotsTxt =
-        RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: AGENT-A \n Disallow: /invalid"))
+        RobotsTxt(nullUrl, prepareResponse(200, "User-Agent: AGENT-A \n Disallow: /invalid"), mockContext)
 
 class RobotsTxtTest {
 

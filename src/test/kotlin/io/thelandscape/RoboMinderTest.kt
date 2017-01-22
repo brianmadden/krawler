@@ -1,3 +1,5 @@
+package io.thelandscape
+
 /**
  * Created by brian.a.madden@gmail.com on 1/14/17.
  *
@@ -45,7 +47,7 @@ class RoboMinderTest {
     }
 
     @Test fun testProcess() {
-        // Verify disallowAll returns false
+        // Verify io.thelandscape.getDisallowAll returns false
         var resp = minder.process(disallowAll)
         assertFalse { resp("") }
 
@@ -53,11 +55,11 @@ class RoboMinderTest {
         resp = minder.process(disallowMe)
         assertFalse { resp("") }
 
-        // Verify allowMe returns true for AGENT-A
+        // Verify io.thelandscape.getAllowMe returns true for AGENT-A
         resp = minder.process(allowMe)
         assertTrue { resp("") }
 
-        // Verify allowAll allows me
+        // Verify io.thelandscape.getAllowAll allows me
         resp = minder.process(allowAll)
         assertTrue { resp("") }
 

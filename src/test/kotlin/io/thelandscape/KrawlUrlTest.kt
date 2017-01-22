@@ -1,3 +1,5 @@
+package io.thelandscape
+
 /**
  * Created by brian.a.madden@gmail.com on 10/21/16.
  *
@@ -41,7 +43,7 @@ class KrawlUrlTest {
         assertEquals("http://testexample.com/", tester.canonicalForm)
     }
 
-    // Test the case where scheme is to be inferred from the parent by starting the URL with //
+    // Test the case where scheme is to be inferred from the io.thelandscape.parent by starting the URL with //
     @Test fun testInferScheme() {
         val httpsUrl = KrawlUrl.new("https://somesafesite.com")
         val url = KrawlUrl.new("//something.org", httpsUrl)

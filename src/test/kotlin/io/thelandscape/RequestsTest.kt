@@ -1,3 +1,5 @@
+package io.thelandscape
+
 /**
  * Created by brian.a.madden@gmail.com on 10/23/16.
  *
@@ -16,14 +18,16 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import com.nhaarman.mockito_kotlin.any
-import com.nhaarman.mockito_kotlin.mock
-import com.nhaarman.mockito_kotlin.times
-import com.nhaarman.mockito_kotlin.verify
+import com.nhaarman.mockito_kotlin.*
 import io.thelandscape.krawler.crawler.KrawlConfig
+import io.thelandscape.krawler.http.HistoryTrackingRedirectStrategy
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestTracker
 import io.thelandscape.krawler.http.Requests
+import org.apache.http.HttpResponse
+import org.apache.http.client.methods.CloseableHttpResponse
+import org.apache.http.client.methods.HttpUriRequest
+import org.apache.http.client.protocol.HttpClientContext
 import org.apache.http.impl.client.CloseableHttpClient
 import org.junit.Test
 import java.time.Instant
@@ -45,7 +49,7 @@ class RequestsTest {
         request.checkUrl(testUrl)
         // it should call execute once with an HttpHead
         // TODO: Swap the any() call to HttpHead somehow
-        verify(mockHttpClient, times(1)).execute(any())
+        verify(mockHttpClient, times(1)).execute(any<HttpUriRequest>(), any<HttpClientContext>())
     }
 
     @Test fun testRequestGet() {
@@ -67,10 +71,9 @@ class RequestsTest {
         assertTrue {end - start > config.politenessDelay * (numTimes - 1)}
 
         // and that the httpClient was called
-        verify(mockHttpClient, times(numTimes * 2)).execute(any())
+        verify(mockHttpClient, times(numTimes * 2)).execute(any<HttpUriRequest>(), any<HttpClientContext>())
     }
 }
-
 
 class RequestTrackerTest {
 

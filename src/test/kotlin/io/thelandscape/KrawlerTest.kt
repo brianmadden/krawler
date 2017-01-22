@@ -1,3 +1,5 @@
+package io.thelandscape
+
 /**
  * Created by brian.a.madden@gmail.com on 12/4/16.
  *
@@ -28,6 +30,7 @@ import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestProviderIf
 import io.thelandscape.krawler.robots.RoboMinderIf
 import io.thelandscape.krawler.robots.RobotsConfig
+import org.apache.http.client.protocol.HttpClientContext
 import org.junit.Before
 import org.junit.Test
 import java.util.concurrent.LinkedBlockingQueue
@@ -48,8 +51,9 @@ class KrawlerTest {
             ThreadPoolExecutor(4, 4, 1000L, TimeUnit.MILLISECONDS, LinkedBlockingQueue<Runnable>(), mockThreadFactory)
     val mockThreadpool = mock<ThreadPoolExecutor>()
     val mockMinder = mock<RoboMinderIf>()
+    val mockContext = mock<HttpClientContext>()
 
-    val preparedResponse = KrawlDocument(exampleUrl, prepareResponse(200, ""))
+    val preparedResponse = KrawlDocument(exampleUrl, prepareResponse(200, ""), mockContext)
 
     class testCrawler(x: KrawlConfig,
                       w: KrawlHistoryIf,
@@ -126,7 +130,7 @@ class KrawlerTest {
         realThreadpoolTestKrawler.doCrawl(KrawlQueueEntry("http://www.test.com"))
 
         // Verify that isSafeToVisit was called, minding robots.txt
-        verify(mockMinder).isSafeToVisit(KrawlUrl.Companion.new("http://www.test.com"))
+        verify(mockMinder).isSafeToVisit(KrawlUrl.new("http://www.test.com"))
         // Ensure we've called to verify this is a unique URL
         verify(mockHistory).hasBeenSeen(any())
         // Now verify that we insert the URL to the history

@@ -1,3 +1,5 @@
+package io.thelandscape
+
 /**
  * Created by brian.a.madden@gmail.com on 12/24/16.
  *
@@ -70,7 +72,7 @@ class KrawlHistoryDaoTest {
 
         assertTrue(wasSeen)
 
-        val wasSeen2 = krawlHistoryDao.hasBeenSeen(KrawlUrl.Companion.new("www.foo.org"))
+        val wasSeen2 = krawlHistoryDao.hasBeenSeen(KrawlUrl.new("www.foo.org"))
         assertFalse(wasSeen2)
     }
 

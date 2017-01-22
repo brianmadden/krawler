@@ -20,6 +20,7 @@
 package io.thelandscape.krawler.http
 
 import org.apache.http.HttpResponse
+import org.apache.http.client.protocol.HttpClientContext
 import org.apache.http.util.EntityUtils
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -31,9 +32,10 @@ import javax.xml.parsers.DocumentBuilderFactory
 interface RequestResponse
 
 data class ErrorResponse(val url: KrawlUrl, val reason: String = "An unknown error has occurred.") : RequestResponse
-class KrawlDocument(val url: KrawlUrl, response: HttpResponse) : RequestResponse {
+class KrawlDocument(val url: KrawlUrl, response: HttpResponse, context: HttpClientContext) : RequestResponse {
 
-    constructor(url: KrawlUrl, response: HttpResponse, parent: KrawlUrl): this(url, response) {
+    constructor(url: KrawlUrl, response: HttpResponse, context: HttpClientContext,
+                parent: KrawlUrl): this(url, response, context) {
         this.parent = parent
     }
 
@@ -57,6 +59,12 @@ class KrawlDocument(val url: KrawlUrl, response: HttpResponse) : RequestResponse
      * Status code
      */
     val statusCode: Int = response.statusLine.statusCode
+
+    /**
+     * Redirect history
+     */
+    val redirectHistory: List<RedirectHistoryNode> =
+            context.getAttribute("fullRedirectHistory") as List<RedirectHistoryNode>? ?: listOf()
 
     /**
      * Document as parsed by JSoup
@@ -88,4 +96,5 @@ class KrawlDocument(val url: KrawlUrl, response: HttpResponse) : RequestResponse
         return (0..this.size - 1).map { this[it] }
     }
 }
+
 

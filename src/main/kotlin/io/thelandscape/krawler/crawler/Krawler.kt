@@ -375,7 +375,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                               history: KrawlHistoryEntry, depth: Int): List<KrawlQueueEntry> {
 
         // Handle redirects by getting the location tag of the header and pushing that into the queue
-        if (doc.statusCode in redirectCodes && config.followRedirects) {
+        if (!config.useFastRedirectStrategy && doc.statusCode in redirectCodes && config.followRedirects) {
             // Queue the redirected URL
             val locStr: String = doc.headers["location"] ?: return listOf()
             val location: KrawlUrl = KrawlUrl.new(locStr, url)
