@@ -96,6 +96,13 @@ Roadmap
 
 Release Notes
 =============
+**0.2.2 (2017-1-21)**
+- Added additonal configuration option for redirect handling in KrawlConfig. Setting
+`useFastRedirectHandling = true` (when redirects are enabled) will cause Krawler to 
+automatically follow redirects, keeping a history of the transitions and status codes.
+This history is present in the `KrawlDocument#redirectHistory` property.
+
+
 **0.2.1 (2017-1-20)**
 - Redirect handling has been changed. Redirects can be followed or not via configuration
 option in `KrawlConfig`. When redirects are enabled the redirected to URL will be added 
@@ -104,7 +111,7 @@ to the queue as a part of the link harvesting phase of Krawler.
 - If an anchor tag specifies `rel='canonical'` the `canonicalForm` will not be subject
 to further processing.
 
--`KrawlUrl.new`'s implementation has been changed to prevent `null` from being returned
+- `KrawlUrl.new`'s implementation has been changed to prevent `null` from being returned
 in certain circumstances.
 
 

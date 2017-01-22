@@ -1,5 +1,5 @@
 group 'io.thelandscape'
-version '0.2.1'
+version '0.2.2'
 
 buildscript {
     ext.kotlin_version = '1.0.6'
