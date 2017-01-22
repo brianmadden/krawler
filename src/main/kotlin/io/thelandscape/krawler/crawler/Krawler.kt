@@ -317,7 +317,15 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             val links = harvestLinks(doc, krawlUrl, history, depth)
 
             // Add the URLs to the queue
-            addUrlToQueue(links)
+            // Insert the URLs to the queue now
+            if (config.persistentCrawl) {
+                // Only in the persistent crawl case do we actually want to use the KrawlQueue
+                krawlQueue!!.push(links)
+                links.forEach { threadpool.submit { doCrawl() } }
+            } else {
+                // Skipping the HSQL backed queue saves us some time
+                links.forEach { threadpool.submit { doCrawl(it) } }
+            }
 
             // Finally call visit
             if (visit)
@@ -354,22 +362,13 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     }
 
     /**
-     * Logic to add a URL to the queue
-     */
-    internal fun addUrlToQueue(links: List<KrawlQueueEntry>) {
-        // Insert the URLs to the queue now
-        if (config.persistentCrawl) {
-            // Only in the persistent crawl case do we actually want to use the KrawlQueue
-            krawlQueue!!.push(links)
-            links.forEach { threadpool.submit { doCrawl() } }
-        } else {
-            // Skipping the HSQL backed queue saves us some time
-            links.forEach { threadpool.submit { doCrawl(it) } }
-        }
-    }
-
-    /**
      * Harvests all of the links from a KrawlQueueDocument and creates KrawlQueueEntries from them.
+     * @param doc [KrawlDocument]: the document to harvest the anchor tags and other links from
+     * @param url [KrawlUrl]: url that links are being harvested from
+     * @param history [KrawlHistoryEntry]: the history entry generated for this URL
+     * @param depth [Int]: The current crawl depth
+     *
+     * @return a list of [KrawlQueueEntry] containing the URLs to crawl
      */
     internal fun harvestLinks(doc: KrawlDocument, url: KrawlUrl,
                               history: KrawlHistoryEntry, depth: Int): List<KrawlQueueEntry> {

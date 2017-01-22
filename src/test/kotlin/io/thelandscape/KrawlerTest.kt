@@ -154,5 +154,4 @@ class KrawlerTest {
         assertTrue { "http://www.testone.com/" in linksText }
         assertTrue { "http://www.example.org/imgone.jpg" in linksText }
     }
-
 }
