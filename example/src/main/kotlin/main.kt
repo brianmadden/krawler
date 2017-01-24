@@ -23,5 +23,9 @@ fun main(args: Array<String>) {
     val config: KrawlConfig = KrawlConfig(totalPages = 100, numThreads = 4)
     val k = SimpleExample(config)
 
+    // Add a few different hosts to the whitelist
+    val allowedHosts = listOf("en.wikipedia.org", "en.wiktionary.org")
+    k.whitelist.addAll(allowedHosts)
+
     k.start("http://en.wikipedia.org")
 }

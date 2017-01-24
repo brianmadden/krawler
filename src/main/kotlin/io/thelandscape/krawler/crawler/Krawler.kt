@@ -78,7 +78,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      */
     internal var minder: RoboMinderIf = RoboMinder(config.userAgent, requestProvider, robotsConfig ?: RobotsConfig())
 
-
     /**
      * Override this function to determine if a URL should be visited.
      * Visiting a URL will issue an HTTP GET request.

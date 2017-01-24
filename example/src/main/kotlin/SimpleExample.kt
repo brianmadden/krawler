@@ -21,6 +21,7 @@ import io.thelandscape.krawler.crawler.Krawler
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
 import java.time.LocalTime
+import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
@@ -30,9 +31,14 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
     private val FILTERS: Regex = Regex(".*(\\.(css|js|bmp|gif|jpe?g|png|tiff?|mid|mp2|mp3|mp4|wav|avi|" +
             "mov|mpeg|ram|m4v|pdf|rm|smil|wmv|swf|wma|zip|rar|gz|tar|ico))$", RegexOption.IGNORE_CASE)
 
+    /**
+     * Threadsafe whitelist of acceptable hosts to visit
+     */
+    val whitelist: MutableSet<String> = ConcurrentSkipListSet()
+
     override fun shouldVisit(url: KrawlUrl): Boolean {
         val withoutGetParams: String = url.canonicalForm.split("?").first()
-        return (!FILTERS.matches(withoutGetParams) && url.host == "en.wikipedia.org")
+        return (!FILTERS.matches(withoutGetParams) && url.host in whitelist)
     }
 
 
