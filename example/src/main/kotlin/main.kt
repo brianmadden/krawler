@@ -24,8 +24,8 @@ fun main(args: Array<String>) {
     val k = SimpleExample(config)
 
     // Add a few different hosts to the whitelist
-    val allowedHosts = listOf("en.wikipedia.org", "en.wiktionary.org", "newpig.com")
+    val allowedHosts = listOf("en.wikipedia.org", "en.wiktionary.org")
     k.whitelist.addAll(allowedHosts)
 
-    k.start("http://newpig.com")
+    k.start("http://en.wikipedia.org")
 }
