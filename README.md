@@ -35,7 +35,7 @@ Krawler is published through jitpack.io at: https://jitpack.io/#brianmadden/kraw
         maven { url "https://jitpack.io" }
    }
    dependencies {
-         compile 'com.github.brianmadden:krawler:0.2.1'
+         compile 'com.github.brianmadden:krawler:0.2.2'
    }
 
 ```
@@ -94,7 +94,7 @@ Roadmap
 Release Notes
 =============
 **0.2.2 (2017-1-21)**
-- Added additonal configuration option for redirect handling in KrawlConfig. Setting
+- Added additional configuration option for redirect handling in KrawlConfig. Setting
 `useFastRedirectHandling = true` (when redirects are enabled) will cause Krawler to 
 automatically follow redirects, keeping a history of the transitions and status codes.
 This history is present in the `KrawlDocument#redirectHistory` property.
