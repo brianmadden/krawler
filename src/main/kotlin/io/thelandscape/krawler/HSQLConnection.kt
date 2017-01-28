@@ -35,6 +35,8 @@ internal class HSQLConnection(fileBacked: Boolean, fileName: String = ".krawl_tm
         private set
 
     init {
+        Class.forName("org.hsqldb.jdbcDriver")
+
         val config = HikariConfig()
 
         if (fileBacked)
