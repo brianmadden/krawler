@@ -38,6 +38,7 @@ import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class KrawlerTest {
 
@@ -53,7 +54,11 @@ class KrawlerTest {
     val mockMinder = mock<RoboMinderIf>()
     val mockContext = mock<HttpClientContext>()
 
-    val preparedResponse = KrawlDocument(exampleUrl, prepareResponse(200, ""), mockContext)
+    val preparedResponse = KrawlDocument(exampleUrl,
+            prepareResponse(200, "<html><head><title>Test</title></head><body>" +
+                    "<div><a href=\"http://www.testone.com\">Test One</a>" +
+                    "<img src=\"imgone.jpg\" /></div></body></html>"),
+            mockContext)
 
     class testCrawler(x: KrawlConfig,
                       w: KrawlHistoryIf,
@@ -140,4 +145,13 @@ class KrawlerTest {
         assertEquals(1, realThreadpoolTestKrawler.visitCount)
     }
 
+    @Test fun testHarvestLinks() {
+        val links: List<KrawlQueueEntry> =
+                mockThreadpoolTestKrawler.harvestLinks(preparedResponse, exampleUrl, KrawlHistoryEntry(), 0)
+
+        assertEquals(2, links.size)
+        val linksText = links.map { it.url }
+        assertTrue { "http://www.testone.com/" in linksText }
+        assertTrue { "http://www.example.org/imgone.jpg" in linksText }
+    }
 }

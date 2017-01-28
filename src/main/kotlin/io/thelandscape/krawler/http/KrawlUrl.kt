@@ -66,7 +66,6 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
     // http://www.ietf.org/rfc/rfc2396.txt
     // URI syntax: [scheme:]scheme-specific-part[#fragment]
 
-    private var firstColonFound: Boolean = false
     // Absolute URLs start with a / immediately after the scheme portion
     var isAbsolute: Boolean = false
         private set
@@ -91,6 +90,7 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
         var hostStart: Int = 0
         var nonHostSlashSeen: Boolean = false
         var hostFound: Boolean = false
+        var firstColonFound: Boolean = false
 
         // Used for decoding encoded characters
         val replaceList: List<Int> = listOf(
@@ -161,8 +161,6 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
                 }
 
                 if (isAbsolute) {
-                    nonHostSlashSeen = true
-
                     // NORMALIZATION: convert to lowercase for normalization
                     // NORMALIZATION: Remove the port if the scheme is http
                     host = url.slice(hostStart until idx)
@@ -176,6 +174,7 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
                     // If we've come this far we're ready to process the path
                     break
                 }
+                nonHostSlashSeen = true
             }
 
             // Increment idx if we didn't do any special handling
