@@ -1,7 +1,7 @@
 /**
- * Created by brian.a.madden@gmail.com on 12/23/16.
+ * Created by brian.a.madden@gmail.com on 1/28/17.
  *
- * Copyright (c) <2016> <H, llc>
+ * Copyright (c) <2017> <H, llc>
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
  * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
@@ -16,16 +16,30 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+package io.thelandscape.krawler.crawler.KrawlQueue
+
 import io.thelandscape.krawler.crawler.KrawlConfig
+import java.util.concurrent.atomic.AtomicInteger
 
-fun main(args: Array<String>) {
+class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config: KrawlConfig) {
 
-    val config: KrawlConfig = KrawlConfig(totalPages = 100, numThreads = 4)
-    val k = SimpleExample(config)
+    private var selector: AtomicInteger = AtomicInteger(0)
 
-    // Add a few different hosts to the whitelist
-    val allowedHosts = listOf("en.wikipedia.org", "en.wiktionary.org")
-    k.whitelist.addAll(allowedHosts)
+    fun pop(): KrawlQueueEntry? {
+        var emptyQueueWaitCount: Long = 0
+        // Pop a URL off the queue
+        var entry: KrawlQueueEntry? = queues[selector.incrementAndGet() % queues.size].pop()
 
-    k.start(listOf("http://en.wikipedia.org", "http://en.wiktionary.org"))
+        // Multiply by queue size, we'll check all of the queues each second
+        while (entry == null && emptyQueueWaitCount < (config.emptyQueueWaitTime * queues.size)) {
+            // Wait for the configured period for more URLs
+            Thread.sleep(Math.ceil(1000.0 / queues.size).toLong())
+            emptyQueueWaitCount++
+
+            // Try to pop again
+            entry = queues[selector.incrementAndGet() % queues.size].pop()
+        }
+
+        return entry
+    }
 }

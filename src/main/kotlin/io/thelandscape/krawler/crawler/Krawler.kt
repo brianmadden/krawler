@@ -25,6 +25,7 @@ import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueEntry
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueHSQLDao
 import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueIf
+import io.thelandscape.krawler.crawler.KrawlQueue.ScheduledQueue
 import io.thelandscape.krawler.http.*
 import io.thelandscape.krawler.robots.RoboMinder
 import io.thelandscape.krawler.robots.RoboMinderIf
@@ -46,7 +47,7 @@ import kotlin.concurrent.write
  */
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                        private var krawlHistory: KrawlHistoryIf? = null,
-                       private var krawlQueue: KrawlQueueIf? = null,
+                       internal var krawlQueues: List<KrawlQueueIf>? = null,
                        robotsConfig: RobotsConfig? = null,
                        private val requestProvider: RequestProviderIf = Requests(config),
                        private val threadpool: ThreadPoolExecutor = ThreadPoolExecutor(
@@ -57,8 +58,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                                LinkedBlockingQueue<Runnable>(config.maximumQueueSize),
                                NoopTaskRejector())) {
 
+
     init {
-        if (krawlHistory == null || krawlQueue == null) {
+        if (krawlHistory == null || krawlQueues == null) {
             val hsqlConnection: HSQLConnection = HSQLConnection(config.persistentCrawl, config.crawlDirectory)
 
             if (krawlHistory == null)
@@ -67,11 +69,15 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             // This is safe because we don't have any KrawlHistoryIf implementations other than HSQL
             val histDao: KrawlHistoryHSQLDao = krawlHistory as KrawlHistoryHSQLDao
 
-            if (krawlQueue == null)
-                krawlQueue = KrawlQueueHSQLDao(hsqlConnection.hsqlSession, histDao)
+            if (krawlQueues == null)
+                krawlQueues = (0 until config.numThreads).map {
+                    KrawlQueueHSQLDao("queue$it", hsqlConnection.hsqlSession, histDao)
+                }
 
         }
     }
+
+    internal val scheduledQueue: ScheduledQueue = ScheduledQueue(krawlQueues!!, config)
 
     /**
      * Handle robots.txt
@@ -166,12 +172,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     }
 
     /**
-     * Arbitrary data structure associated with this crawl to provide context or a shared
-     * resource.
-     */
-    open var crawlContext: Any? = null
-
-    /**
      * Starts the Krawler with the URL provided. This method will call `onCrawlStart()`
      * perform the crawl and then call `onCrawlEnd()`. This method will block for the duration
      * of the crawl.
@@ -191,12 +191,13 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     fun start(seedUrl: List<String>) {
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
-        val entries: List<KrawlQueueEntry> = krawlUrls.map { KrawlQueueEntry(it.canonicalForm) }
 
-        krawlQueue!!.push(entries)
+        (0 until krawlUrls.size).forEach {
+            krawlQueues!![it].push(listOf(KrawlQueueEntry(krawlUrls[it].canonicalForm)))
+        }
 
         onCrawlStart()
-        entries.forEach { threadpool.submit { doCrawl() } }
+        krawlQueues!!.forEach { threadpool.submit { doCrawl(it as KrawlQueueHSQLDao) } }
         while(!threadpool.isTerminated && threadpool.activeCount > 0) { Thread.sleep(250) }
         threadpool.shutdown()
         onCrawlEnd()
@@ -220,13 +221,15 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      */
     fun startNonblocking(seedUrl: List<String>) {
         // Convert all URLs to KrawlUrls
+        // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
-        val entries: List<KrawlQueueEntry> = krawlUrls.map { KrawlQueueEntry(it.canonicalForm) }
 
-        krawlQueue!!.push(entries)
+        (0 until krawlQueues!!.size).forEach {
+            krawlQueues!![it].push(listOf(KrawlQueueEntry(krawlUrls[it].canonicalForm)))
+        }
 
         onCrawlStart()
-        (1..entries.size).forEach { threadpool.submit { doCrawl() } }
+        krawlQueues!!.forEach { threadpool.submit { doCrawl(it as KrawlQueueHSQLDao) } }
     }
 
     /**
@@ -266,11 +269,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     // Set of redirect codes
     private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
 
-    internal fun doCrawl(queuedEntry: KrawlQueueEntry? = krawlQueue!!.pop()) {
+    internal fun doCrawl(queue: KrawlQueueHSQLDao) {
         // If we're done, we're done
         if(!continueCrawling) return
 
-        val entry: KrawlQueueEntry = waitForUrl(queuedEntry) ?: return
+        val entry: KrawlQueueEntry = scheduledQueue.pop() ?: return
 
         val krawlUrl: KrawlUrl = KrawlUrl.new(entry.url)
         val depth: Int = entry.depth
@@ -315,16 +318,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             val links = harvestLinks(doc, krawlUrl, history, depth)
 
-            // Add the URLs to the queue
-            // Insert the URLs to the queue now
-            if (config.persistentCrawl) {
-                // Only in the persistent crawl case do we actually want to use the KrawlQueue
-                krawlQueue!!.push(links)
-                links.forEach { threadpool.submit { doCrawl() } }
-            } else {
-                // Skipping the HSQL backed queue saves us some time
-                links.forEach { threadpool.submit { doCrawl(it) } }
-            }
+
+            queue.push(links)
 
             // Finally call visit
             if (visit)
@@ -333,31 +328,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             if (check)
                 check(krawlUrl, doc.statusCode)
         }
-    }
-
-    /**
-     * Method attempts to pop a KrawlQueueEntry from the queue once per second for up to krawlConfig.emptyQueueWaitTime
-     *
-     * @param entry KrawlQueueEntry?: The starting entry, if this value is null the wait will happen, otherwise it's
-     * simply returned as is.
-     *
-     * @return [KrawlQueueEntry]?: A KrawlQueueEntry, or null if nothing could be popped from the queue
-     */
-    internal fun waitForUrl(queuedEntry: KrawlQueueEntry?): KrawlQueueEntry? {
-        var emptyQueueWaitCount: Long = 0
-        // Pop a URL off the queue
-        var entry: KrawlQueueEntry? = queuedEntry
-
-        while (entry == null && emptyQueueWaitCount < config.emptyQueueWaitTime) {
-            // Wait for the configured period for more URLs
-            Thread.sleep(1000)
-            emptyQueueWaitCount++
-
-            // Try to pop again
-            entry = krawlQueue!!.pop()
-        }
-
-        return entry
+        // Re-schedule doCrawl
+        threadpool.submit { doCrawl(queue) }
     }
 
     /**
