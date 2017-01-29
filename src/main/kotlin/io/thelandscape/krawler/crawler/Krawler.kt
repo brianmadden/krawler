@@ -221,7 +221,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      */
     fun startNonblocking(seedUrl: List<String>) {
         // Convert all URLs to KrawlUrls
-        // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
         (0 until krawlQueues!!.size).forEach {
@@ -317,7 +316,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             }
 
             val links = harvestLinks(doc, krawlUrl, history, depth)
-
 
             queue.push(links)
 
