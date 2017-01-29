@@ -193,7 +193,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
         (0 until krawlUrls.size).forEach {
-            krawlQueues!![it].push(listOf(KrawlQueueEntry(krawlUrls[it].canonicalForm)))
+            krawlQueues!![it].push(listOf(KrawlQueueEntry(krawlUrls[it % krawlQueues!!.size].canonicalForm)))
         }
 
         onCrawlStart()
@@ -224,7 +224,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
         (0 until krawlQueues!!.size).forEach {
-            krawlQueues!![it].push(listOf(KrawlQueueEntry(krawlUrls[it].canonicalForm)))
+            krawlQueues!![it].push(listOf(KrawlQueueEntry(krawlUrls[it % krawlQueues!!.size].canonicalForm)))
         }
 
         onCrawlStart()
