@@ -27,11 +27,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config: KrawlConfig) {
 
-    // Start these atomic Ints at queues.size - 1 so that the first incrementAndGet() results in a 0
-    // otherwise cases where there are fewer URLs than queues will cause a lot of spinning popping
-    // nulls from the queue
-    private var selector: AtomicInteger = AtomicInteger(queues.size - 1)
-    private var pushAffinitySelector: AtomicInteger = AtomicInteger(queues.size - 1)
+    private var popSelector: AtomicInteger = AtomicInteger(0)
+    private var pushSelector: AtomicInteger = AtomicInteger(0)
 
     private val pushAffinityCache: LoadingCache<String, Int> = CacheBuilder.newBuilder()
             .maximumSize(1000)
@@ -39,7 +36,7 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
             .build(
                     object : CacheLoader<String, Int>() {
                         override fun load(key: String): Int {
-                            return pushAffinitySelector.incrementAndGet() % queues.size
+                            return pushSelector.getAndIncrement() % queues.size
                         }
                     }
             )
@@ -67,11 +64,11 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
     fun pop(): KrawlQueueEntry? {
         var emptyQueueWaitCount: Long = 0
 
-        val currentAffinitySelector = pushAffinitySelector.get()
+        val currentAffinitySelector = pushSelector.get()
         val modVal = if (currentAffinitySelector > queues.size) queues.size else currentAffinitySelector
 
         // Pop a URL off the queue
-        var entry: KrawlQueueEntry? = queues[selector.incrementAndGet() % modVal].pop()
+        var entry: KrawlQueueEntry? = queues[popSelector.getAndIncrement() % modVal].pop()
 
         // Multiply by queue size, we'll check all of the queues each second
         while (entry == null && emptyQueueWaitCount < (config.emptyQueueWaitTime * modVal)) {
@@ -80,7 +77,7 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
             emptyQueueWaitCount++
 
             // Try to pop again
-            entry = queues[selector.incrementAndGet() % modVal].pop()
+            entry = queues[popSelector.getAndIncrement() % modVal].pop()
         }
 
         return entry

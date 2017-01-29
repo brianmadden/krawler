@@ -37,7 +37,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 
-
 /**
  * Class defines the operations and data structures used to perform a web crawl.
  *
