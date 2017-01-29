@@ -245,10 +245,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * Private members
      */
     // Manage whether or not we should continue crawling
-    private val continueLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
-    private var continueCrawling: Boolean = true
-        get() = continueLock.read { field }
-        set(value) = continueLock.write { field = value }
+    @Volatile private var continueCrawling: Boolean = true
 
     // Global visit count and domain visit count
     private val visitCountLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
@@ -259,7 +256,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             // If we're setting the visit count to the configured number of
             // pages to crawl, flip the switch to stop crawling
-            if (value == config.totalPages) {
+            if (value >= config.totalPages) {
                 continueCrawling = false
             }
         }
@@ -300,6 +297,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             visitCount++ // This will also set continueCrawling to false if the totalPages has been hit
 
+            // Check continue crawling here again to prevent race conditions that causes over-crawling
+            if (!continueCrawling) return
             val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
 
             // If there was an error on trying to get the doc, call content fetch error
