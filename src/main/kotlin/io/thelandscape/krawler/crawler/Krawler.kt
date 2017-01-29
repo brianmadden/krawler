@@ -192,12 +192,12 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
-        (0 until krawlUrls.size).forEach {
-            krawlQueues!![it % krawlQueues!!.size].push(listOf(KrawlQueueEntry(krawlUrls[it].canonicalForm)))
+        krawlUrls.forEach {
+            scheduledQueue.push(it.domain, listOf(KrawlQueueEntry(it.canonicalForm)))
         }
 
         onCrawlStart()
-        krawlQueues!!.forEach { threadpool.submit { doCrawl(it as KrawlQueueHSQLDao) } }
+        (1..krawlUrls.size).forEach { threadpool.submit { doCrawl() } }
         while(!threadpool.isTerminated && threadpool.activeCount > 0) { Thread.sleep(250) }
         threadpool.shutdown()
         onCrawlEnd()
@@ -223,12 +223,12 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
-        (0 until krawlQueues!!.size).forEach {
-            krawlQueues!![it % krawlQueues!!.size].push(listOf(KrawlQueueEntry(krawlUrls[it].canonicalForm)))
+        krawlUrls.forEach {
+            scheduledQueue.push(it.domain, listOf(KrawlQueueEntry(it.canonicalForm)))
         }
 
         onCrawlStart()
-        krawlQueues!!.forEach { threadpool.submit { doCrawl(it as KrawlQueueHSQLDao) } }
+        (1..krawlUrls.size).forEach { threadpool.submit { doCrawl() } }
     }
 
     /**
@@ -268,7 +268,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     // Set of redirect codes
     private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
 
-    internal fun doCrawl(queue: KrawlQueueHSQLDao) {
+    internal fun doCrawl() {
         // If we're done, we're done
         if(!continueCrawling) return
 
@@ -317,7 +317,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             val links = harvestLinks(doc, krawlUrl, history, depth)
 
-            queue.push(links)
+            scheduledQueue.push(krawlUrl.domain, links)
 
             // Finally call visit
             if (visit)
@@ -327,7 +327,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 check(krawlUrl, doc.statusCode)
         }
         // Re-schedule doCrawl
-        threadpool.submit { doCrawl(queue) }
+        threadpool.submit { doCrawl() }
     }
 
     /**

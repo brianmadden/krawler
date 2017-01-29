@@ -18,26 +18,69 @@
 
 package io.thelandscape.krawler.crawler.KrawlQueue
 
+import com.google.common.cache.CacheBuilder
+import com.google.common.cache.CacheLoader
+import com.google.common.cache.LoadingCache
 import io.thelandscape.krawler.crawler.KrawlConfig
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config: KrawlConfig) {
 
-    private var selector: AtomicInteger = AtomicInteger(0)
+    // Start these atomic Ints at queues.size - 1 so that the first incrementAndGet() results in a 0
+    // otherwise cases where there are fewer URLs than queues will cause a lot of spinning popping
+    // nulls from the queue
+    private var selector: AtomicInteger = AtomicInteger(queues.size - 1)
+    private var pushAffinitySelector: AtomicInteger = AtomicInteger(queues.size - 1)
 
+    private val pushAffinityCache: LoadingCache<String, Int> = CacheBuilder.newBuilder()
+            .maximumSize(1000)
+            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .build(
+                    object : CacheLoader<String, Int>() {
+                        override fun load(key: String): Int {
+                            return pushAffinitySelector.incrementAndGet() % queues.size
+                        }
+                    }
+            )
+
+    /**
+     * Pushes KrawlQueueEntries to the queue that it has affinity with.
+     * This should help create better parallelism when crawling multiple domains.
+     *
+     * @param referringDomain [String]: The referring domain to determine queue affinity
+     * @param entries [List]: List of KrawlQueueEntries to push to the appropriate queue
+     *
+     * @return [List]: List of KrawlQueueEntries that were pushed
+     */
+    fun push(referringDomain: String, entries: List<KrawlQueueEntry>): List<KrawlQueueEntry> {
+        val affinity = pushAffinityCache[referringDomain]
+        return queues[affinity].push(entries)
+    }
+
+    /**
+     * Pops a KrawlQueueEntry from the first queue with an entry available. This method
+     * will rotate through the queues in round robin fashion to try to increase parallelism.
+     *
+     * @return [KrawlQueueEntry?]: A single KrawlQueueEntry if available, null otherwise
+     */
     fun pop(): KrawlQueueEntry? {
         var emptyQueueWaitCount: Long = 0
+
+        val currentAffinitySelector = pushAffinitySelector.get()
+        val modVal = if (currentAffinitySelector > queues.size) queues.size else currentAffinitySelector
+
         // Pop a URL off the queue
-        var entry: KrawlQueueEntry? = queues[selector.incrementAndGet() % queues.size].pop()
+        var entry: KrawlQueueEntry? = queues[selector.incrementAndGet() % modVal].pop()
 
         // Multiply by queue size, we'll check all of the queues each second
-        while (entry == null && emptyQueueWaitCount < (config.emptyQueueWaitTime * queues.size)) {
+        while (entry == null && emptyQueueWaitCount < (config.emptyQueueWaitTime * modVal)) {
             // Wait for the configured period for more URLs
-            Thread.sleep(Math.ceil(1000.0 / queues.size).toLong())
+            Thread.sleep(Math.ceil(1000.0 / modVal).toLong())
             emptyQueueWaitCount++
 
             // Try to pop again
-            entry = queues[selector.incrementAndGet() % queues.size].pop()
+            entry = queues[selector.incrementAndGet() % modVal].pop()
         }
 
         return entry
