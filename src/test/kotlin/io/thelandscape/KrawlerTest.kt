@@ -45,7 +45,7 @@ class KrawlerTest {
     val exampleUrl = KrawlUrl.new("http://www.example.org")
     val mockConfig = KrawlConfig(emptyQueueWaitTime = 1)
     val mockHistory = mock<KrawlHistoryIf>()
-    val mockQueue = mock<KrawlQueueIf>()
+    val mockQueue = listOf(mock<KrawlQueueIf>())
     val mockRequests = mock<RequestProviderIf>()
     val mockThreadFactory = mock<ThreadFactory>()
     val threadpool: ThreadPoolExecutor =
@@ -62,7 +62,7 @@ class KrawlerTest {
 
     class testCrawler(x: KrawlConfig,
                       w: KrawlHistoryIf,
-                      y: KrawlQueueIf,
+                      y: List<KrawlQueueIf>,
                       u: RobotsConfig?,
                       v: RequestProviderIf,
                       z: ThreadPoolExecutor): Krawler(x, w, y, u, v, z) {
@@ -130,10 +130,13 @@ class KrawlerTest {
         whenever(mockRequests.getUrl(any())).thenReturn(preparedResponse)
         // Make robo minder return true
         whenever(mockMinder.isSafeToVisit(any())).thenReturn(true)
+        //
+        whenever(mockQueue[0].pop()).thenReturn(KrawlQueueEntry("http://www.test.com"))
 
         // Get it started
-        realThreadpoolTestKrawler.doCrawl(KrawlQueueEntry("http://www.test.com"))
+        realThreadpoolTestKrawler.doCrawl()
 
+        verify(mockQueue[0]).pop()
         // Verify that isSafeToVisit was called, minding robots.txt
         verify(mockMinder).isSafeToVisit(KrawlUrl.new("http://www.test.com"))
         // Ensure we've called to verify this is a unique URL

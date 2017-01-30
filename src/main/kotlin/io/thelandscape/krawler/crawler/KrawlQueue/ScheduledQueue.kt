@@ -65,7 +65,11 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
         var emptyQueueWaitCount: Long = 0
 
         val currentAffinitySelector = pushSelector.get()
-        val modVal = if (currentAffinitySelector > queues.size) queues.size else currentAffinitySelector
+        // This should only be 0 in the case of testing, so this is kind of a hack
+        val modVal = if (currentAffinitySelector > queues.size || currentAffinitySelector == 0)
+            queues.size
+        else
+            currentAffinitySelector
 
         // Pop a URL off the queue
         var entry: KrawlQueueEntry? = queues[popSelector.getAndIncrement() % modVal].pop()

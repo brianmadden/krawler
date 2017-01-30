@@ -245,16 +245,23 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      */
 
     private val visitLock: ReentrantLock = ReentrantLock()
-    private var visitCount: Int = 0
+    private var continueCrawling: Boolean = true
+
+    var visitCount: Int = 0
         get() = visitLock.withLock { field }
-        set(value) = visitLock.withLock { field = value }
+        private set(value) = visitLock.withLock {
+            field = value
+
+            if (field == config.totalPages)
+                continueCrawling = false
+        }
 
     // Set of redirect codes
     private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
 
     internal fun doCrawl() {
         // If we're done, we're done
-        if(visitCount > config.totalPages) return
+        if(!continueCrawling) return
 
         val entry: KrawlQueueEntry = scheduledQueue.pop() ?: return
 
@@ -287,7 +294,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             visitCount++
 
             // Check continue crawling here again to prevent race conditions that causes over-crawling
-            if (visitCount > config.totalPages) return
+            if (!continueCrawling) return
             val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
 
             // If there was an error on trying to get the doc, call content fetch error
