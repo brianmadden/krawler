@@ -24,11 +24,20 @@ import com.google.common.cache.LoadingCache
 import io.thelandscape.krawler.crawler.KrawlConfig
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config: KrawlConfig) {
 
-    private var popSelector: AtomicInteger = AtomicInteger(0)
-    private var pushSelector: AtomicInteger = AtomicInteger(0)
+    private val popLock: ReentrantLock = ReentrantLock()
+    private var popSelector: Int = 0
+        get() = popLock.withLock { field }
+        set(value) = popLock.withLock { field = value }
+
+    private val pushLock: ReentrantLock = ReentrantLock()
+    private var pushSelector: Int = 0
+        get() = pushLock.withLock { field }
+        set(value) = pushLock.withLock { field = value }
 
     private val pushAffinityCache: LoadingCache<String, Int> = CacheBuilder.newBuilder()
             .maximumSize(1000)
@@ -36,7 +45,7 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
             .build(
                     object : CacheLoader<String, Int>() {
                         override fun load(key: String): Int {
-                            return pushSelector.getAndIncrement() % queues.size
+                            return pushSelector++ % queues.size
                         }
                     }
             )
@@ -64,15 +73,14 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
     fun pop(): KrawlQueueEntry? {
         var emptyQueueWaitCount: Long = 0
 
-        val currentAffinitySelector = pushSelector.get()
         // This should only be 0 in the case of testing, so this is kind of a hack
-        val modVal = if (currentAffinitySelector > queues.size || currentAffinitySelector == 0)
+        val modVal = if (pushSelector > queues.size || pushSelector == 0)
             queues.size
         else
-            currentAffinitySelector
+            pushSelector
 
         // Pop a URL off the queue
-        var entry: KrawlQueueEntry? = queues[popSelector.getAndIncrement() % modVal].pop()
+        var entry: KrawlQueueEntry? = queues[popSelector++ % modVal].pop()
 
         // Multiply by queue size, we'll check all of the queues each second
         while (entry == null && emptyQueueWaitCount < (config.emptyQueueWaitTime * modVal)) {
@@ -81,7 +89,7 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
             emptyQueueWaitCount++
 
             // Try to pop again
-            entry = queues[popSelector.getAndIncrement() % modVal].pop()
+            entry = queues[popSelector++ % modVal].pop()
         }
 
         return entry
