@@ -33,9 +33,7 @@ import io.thelandscape.krawler.robots.RobotsConfig
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.locks.ReentrantReadWriteLock
-import kotlin.concurrent.read
-import kotlin.concurrent.write
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Class defines the operations and data structures used to perform a web crawl.
@@ -244,29 +242,15 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     /**
      * Private members
      */
-    // Manage whether or not we should continue crawling
-    @Volatile private var continueCrawling: Boolean = true
 
-    // Global visit count and domain visit count
-    private val visitCountLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
-    var visitCount: Int = 0
-        get() = visitCountLock.read { field }
-        private set(value) = visitCountLock.write {
-            field = value
-
-            // If we're setting the visit count to the configured number of
-            // pages to crawl, flip the switch to stop crawling
-            if (value >= config.totalPages) {
-                continueCrawling = false
-            }
-        }
+    private val visitCount: AtomicInteger = AtomicInteger(0)
 
     // Set of redirect codes
     private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
 
     internal fun doCrawl() {
         // If we're done, we're done
-        if(!continueCrawling) return
+        if(visitCount.get() > config.totalPages) return
 
         val entry: KrawlQueueEntry = scheduledQueue.pop() ?: return
 
@@ -295,10 +279,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl))
                 return
 
-            visitCount++ // This will also set continueCrawling to false if the totalPages has been hit
+            // This will also set continueCrawling to false if the totalPages has been hit
+            val visits: Int = visitCount.incrementAndGet()
 
             // Check continue crawling here again to prevent race conditions that causes over-crawling
-            if (!continueCrawling) return
+            if (visits > config.totalPages) return
             val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
 
             // If there was an error on trying to get the doc, call content fetch error
@@ -347,7 +332,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             val location: KrawlUrl = KrawlUrl.new(locStr, url)
             // Decrement visit count since a redirect is sort of a continuation rather than a new page
             // TODO: Is this the behavior we want?
-            visitCount--
+            visitCount.decrementAndGet()
             return listOf(KrawlQueueEntry(location.canonicalForm, history, depth))
         }
 
