@@ -244,25 +244,14 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * Private members
      */
 
-    private val visitLock: ReentrantLock = ReentrantLock()
-    private var continueCrawling: Boolean = true
+    val lock: Any = Any()
+    // This is not locked and should only be used under synchronized block
 
-    var visitCount: Int = 0
-        get() = visitLock.withLock { field }
-        private set(value) = visitLock.withLock {
-            field = value
-
-            if (field == config.totalPages)
-                continueCrawling = false
-        }
-
+    @Volatile var visitCount: Int = 0
     // Set of redirect codes
     private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
 
     internal fun doCrawl() {
-        // If we're done, we're done
-        if(!continueCrawling) return
-
         val entry: KrawlQueueEntry = scheduledQueue.pop() ?: return
 
         val krawlUrl: KrawlUrl = KrawlUrl.new(entry.url)
@@ -290,11 +279,12 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl))
                 return
 
-            // This will also set continueCrawling to false if the totalPages has been hit
-            visitCount++
+            // Check if we should continue crawling
+            synchronized(lock) {
+                // This will also set continueCrawling to false if the totalPages has been hit
+                if (++visitCount > config.totalPages) return
+            }
 
-            // Check continue crawling here again to prevent race conditions that causes over-crawling
-            if (!continueCrawling) return
             val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
 
             // If there was an error on trying to get the doc, call content fetch error
@@ -341,9 +331,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             // Queue the redirected URL
             val locStr: String = doc.headers["location"] ?: return listOf()
             val location: KrawlUrl = KrawlUrl.new(locStr, url)
-            // Decrement visit count since a redirect is sort of a continuation rather than a new page
-            // TODO: Is this the behavior we want?
-            visitCount--
+
             return listOf(KrawlQueueEntry(location.canonicalForm, history, depth))
         }
 
