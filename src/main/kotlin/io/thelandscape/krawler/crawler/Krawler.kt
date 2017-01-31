@@ -243,11 +243,14 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     /**
      * Private members
      */
+    // Lock for the synchronized block to determine when to stop
+    val syncLock: Any = Any()
 
-    val lock: Any = Any()
-    // This is not locked and should only be used under synchronized block
+    private val visitLock: ReentrantLock = ReentrantLock()
+    var visitCount: Int = 0
+        get() = visitLock.withLock { field }
+        private set(value) = visitLock.withLock { field = value }
 
-    @Volatile var visitCount: Int = 0
     // Set of redirect codes
     private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
 
@@ -280,7 +283,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 return
 
             // Check if we should continue crawling
-            synchronized(lock) {
+            synchronized(syncLock) {
                 // This will also set continueCrawling to false if the totalPages has been hit
                 if (++visitCount > config.totalPages) return
             }
