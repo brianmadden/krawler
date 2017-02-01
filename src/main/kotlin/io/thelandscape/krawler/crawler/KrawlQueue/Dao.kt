@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit
 object historyConverter :
         SimpleConverter<KrawlHistoryEntry>( { row, c -> KrawlHistoryEntry(row.long(c)) }, KrawlHistoryEntry::id)
 
-object krawlQueueTable : Table<KrawlQueueEntry, String>("krawlQueue",
+class KrawlQueueTable(name: String) : Table<KrawlQueueEntry, String>(name,
         TableConfiguration(standardDefaults + timeDefaults + reifiedValue(KrawlHistoryEntry()),
                 standardConverters + timeConverters + reifiedConverter(historyConverter), camelToLowerUnderscore)) {
 
@@ -50,12 +50,14 @@ object krawlQueueTable : Table<KrawlQueueEntry, String>("krawlQueue",
 
 // TODO: Figure out how to allow this to take a generic KrawlHistoryIf
 // rather than an HSQLDao while keeping the interface clean
-class KrawlQueueHSQLDao(session: Session, private val histDao: KrawlHistoryHSQLDao):
-        KrawlQueueIf, AbstractDao<KrawlQueueEntry, String>(session, krawlQueueTable, KrawlQueueEntry::url) {
+class KrawlQueueHSQLDao(name: String,
+                        session: Session,
+                        private val histDao: KrawlHistoryHSQLDao):
+        KrawlQueueIf, AbstractDao<KrawlQueueEntry, String>(session, KrawlQueueTable(name), KrawlQueueEntry::url) {
 
     init {
         // Create queue table
-        session.update("CREATE TABLE IF NOT EXISTS krawlQueue " +
+        session.update("CREATE TABLE IF NOT EXISTS $name " +
                 "(url VARCHAR(2048) NOT NULL, parent INT, depth INT, timestamp TIMESTAMP)")
     }
 

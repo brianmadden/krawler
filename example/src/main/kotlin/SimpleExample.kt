@@ -22,9 +22,6 @@ import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
 import java.time.LocalTime
 import java.util.concurrent.ConcurrentSkipListSet
-import java.util.concurrent.locks.ReentrantReadWriteLock
-import kotlin.concurrent.read
-import kotlin.concurrent.write
 
 class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
@@ -41,18 +38,15 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
         return (!FILTERS.matches(withoutGetParams) && url.host in whitelist)
     }
 
-
-    private val counterLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
     private var counter: Int = 0
-        get() = counterLock.read { field }
-        set(value) = counterLock.write { field = value}
+    private val counterLock: Any = Any()
 
     override fun visit(url: KrawlUrl, doc: KrawlDocument) {
-        println("${++counter}. Crawling ${url.canonicalForm}")
+        println("${synchronized(counterLock) {++counter}}. Crawling ${url.canonicalForm}")
     }
 
     override fun onContentFetchError(url: KrawlUrl, reason: String) {
-        println("${++counter}. Tried to crawl ${url.canonicalForm} but failed to read the content.")
+        println("${synchronized(counterLock) {++counter}}. Tried to crawl ${url.canonicalForm} but failed to read the content.")
     }
 
     private var startTimestamp: Long = 0
