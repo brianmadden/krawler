@@ -33,8 +33,6 @@ import io.thelandscape.krawler.robots.RobotsConfig
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.locks.ReentrantLock
-import kotlin.concurrent.withLock
 
 /**
  * Class defines the operations and data structures used to perform a web crawl.
@@ -244,12 +242,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * Private members
      */
     // Lock for the synchronized block to determine when to stop
-    val syncLock: Any = Any()
+    private val syncLock: Any = Any()
 
-    private val visitLock: ReentrantLock = ReentrantLock()
-    var visitCount: Int = 0
-        get() = visitLock.withLock { field }
-        private set(value) = visitLock.withLock { field = value }
+    /** This should be utilized within a locked or synchronized block **/
+    @Volatile var visitCount: Int = 0
+        private set
 
     // Set of redirect codes
     private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
@@ -284,8 +281,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             // Check if we should continue crawling
             synchronized(syncLock) {
-                // This will also set continueCrawling to false if the totalPages has been hit
-                if (++visitCount > config.totalPages) return
+                if (visitCount == config.totalPages + 1) return
+                visitCount++
             }
 
             val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
@@ -334,6 +331,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             // Queue the redirected URL
             val locStr: String = doc.headers["location"] ?: return listOf()
             val location: KrawlUrl = KrawlUrl.new(locStr, url)
+
+            // We won't count it as a visit sinc
+            synchronized(syncLock) { visitCount-- }
 
             return listOf(KrawlQueueEntry(location.canonicalForm, history, depth))
         }

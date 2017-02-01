@@ -23,21 +23,14 @@ import com.google.common.cache.CacheLoader
 import com.google.common.cache.LoadingCache
 import io.thelandscape.krawler.crawler.KrawlConfig
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.locks.ReentrantLock
-import kotlin.concurrent.withLock
 
 class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config: KrawlConfig) {
 
-    private val popLock: ReentrantLock = ReentrantLock()
+    private val popLock: Any = Any()
     private var popSelector: Int = 0
-        get() = popLock.withLock { field }
-        set(value) = popLock.withLock { field = value }
 
-    private val pushLock: ReentrantLock = ReentrantLock()
+    private val pushLock: Any = Any()
     private var pushSelector: Int = 0
-        get() = pushLock.withLock { field }
-        set(value) = pushLock.withLock { field = value }
 
     private val pushAffinityCache: LoadingCache<String, Int> = CacheBuilder.newBuilder()
             .maximumSize(1000)
@@ -45,7 +38,7 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
             .build(
                     object : CacheLoader<String, Int>() {
                         override fun load(key: String): Int {
-                            return pushSelector++ % queues.size
+                            return synchronized(pushLock) { pushSelector++ % queues.size }
                         }
                     }
             )
@@ -80,7 +73,7 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
             pushSelector
 
         // Pop a URL off the queue
-        var entry: KrawlQueueEntry? = queues[popSelector++ % modVal].pop()
+        var entry: KrawlQueueEntry? = synchronized(popLock) { queues[popSelector++ % modVal].pop() }
 
         // Multiply by queue size, we'll check all of the queues each second
         while (entry == null && emptyQueueWaitCount < (config.emptyQueueWaitTime * modVal)) {
@@ -89,7 +82,7 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
             emptyQueueWaitCount++
 
             // Try to pop again
-            entry = queues[popSelector++ % modVal].pop()
+            entry = synchronized(popLock) { queues[popSelector++ % modVal].pop() }
         }
 
         return entry
