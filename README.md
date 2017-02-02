@@ -35,7 +35,7 @@ Krawler is published through jitpack.io at: https://jitpack.io/#brianmadden/kraw
         maven { url "https://jitpack.io" }
    }
    dependencies {
-         compile 'com.github.brianmadden:krawler:0.2.2'
+         compile 'com.github.brianmadden:krawler:0.3.0'
    }
 
 ```
@@ -55,23 +55,25 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
     private val FILTERS: Regex = Regex(".*(\\.(css|js|bmp|gif|jpe?g|png|tiff?|mid|mp2|mp3|mp4|wav|avi|" +
             "mov|mpeg|ram|m4v|pdf|rm|smil|wmv|swf|wma|zip|rar|gz|tar|ico))$", RegexOption.IGNORE_CASE)
 
+    /**
+     * Threadsafe whitelist of acceptable hosts to visit
+     */
+    val whitelist: MutableSet<String> = ConcurrentSkipListSet()
+
     override fun shouldVisit(url: KrawlUrl): Boolean {
         val withoutGetParams: String = url.canonicalForm.split("?").first()
-        return (!FILTERS.matches(withoutGetParams) && url.host == "en.wikipedia.org")
+        return (!FILTERS.matches(withoutGetParams) && url.host in whitelist)
     }
 
-
-    private val counterLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
     private var counter: Int = 0
-        get() = counterLock.read { field }
-        set(value) = counterLock.write { field = value}
+    private val counterLock: Any = Any()
 
     override fun visit(url: KrawlUrl, doc: KrawlDocument) {
-        println("${++counter}. Crawling ${url.canonicalForm}")
+        println("${synchronized(counterLock) {++counter}}. Crawling ${url.canonicalForm}")
     }
 
     override fun onContentFetchError(url: KrawlUrl, reason: String) {
-        println("${++counter}. Tried to crawl ${url.canonicalForm} but failed to read the content.")
+        println("${synchronized(counterLock) {++counter}}. Tried to crawl ${url.canonicalForm} but failed to read the content.")
     }
 
     private var startTimestamp: Long = 0
@@ -93,6 +95,14 @@ Roadmap
 
 Release Notes
 =============
+**0.3.0 (2017-2-2)**
+- Created 1:1 mapping between threads and the number of queues used to serve URLs to visit. URLs have an
+affinity for a particular queue based on their domain. All URLs from that domain will end up in the same
+queue. This improves parallel crawl performance by reducing the frequency that the politeness delay
+effects requests. For crawls bound to fewer domains than queues, the excess queues are not used.
+
+- Many bug fixes including fix that eliminates accidental over-crawling.
+
 **0.2.2 (2017-1-21)**
 - Added additional configuration option for redirect handling in KrawlConfig. Setting
 `useFastRedirectHandling = true` (when redirects are enabled) will cause Krawler to 
