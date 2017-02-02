@@ -35,7 +35,7 @@ Krawler is published through jitpack.io at: https://jitpack.io/#brianmadden/kraw
         maven { url "https://jitpack.io" }
    }
    dependencies {
-         compile 'com.github.brianmadden:krawler:0.3.0'
+         compile 'com.github.brianmadden:krawler:0.3.1'
    }
 
 ```
@@ -95,7 +95,7 @@ Roadmap
 
 Release Notes
 =============
-**0.3.0 (2017-2-2)**
+**0.3.1 (2017-2-2)**
 - Created 1:1 mapping between threads and the number of queues used to serve URLs to visit. URLs have an
 affinity for a particular queue based on their domain. All URLs from that domain will end up in the same
 queue. This improves parallel crawl performance by reducing the frequency that the politeness delay
