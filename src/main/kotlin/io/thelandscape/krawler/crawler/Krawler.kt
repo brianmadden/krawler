@@ -281,7 +281,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             // Check if we should continue crawling
             synchronized(syncLock) {
-                if ((config.totalPages > -1) && (++visitCount > config.totalPages)) return
+                if ((++visitCount > config.totalPages) && (config.totalPages > -1)) return
             }
 
             val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
