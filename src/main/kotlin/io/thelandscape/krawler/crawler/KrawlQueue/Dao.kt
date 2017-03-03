@@ -86,6 +86,9 @@ class KrawlQueueHSQLDao(name: String,
     }
 
     override fun push(urls: List<KrawlQueueEntry>): List<KrawlQueueEntry> {
-        return this.batchInsert(urls)
+        if (urls.isNotEmpty())
+            return this.batchInsert(urls)
+
+        return listOf()
     }
 }

@@ -21,9 +21,9 @@ package io.thelandscape.krawler.crawler.History
 import com.github.andrewoma.kwery.core.Session
 import com.github.andrewoma.kwery.mapper.*
 import com.github.andrewoma.kwery.mapper.util.camelToLowerUnderscore
-import io.thelandscape.krawler.HSQLConnection
-import io.thelandscape.krawler.crawler.KrawlConfig
 import io.thelandscape.krawler.http.KrawlUrl
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
 import java.time.LocalDateTime
 
 object krawlHistoryTable : Table<KrawlHistoryEntry, Long>("KrawlHistory",
@@ -50,6 +50,8 @@ class KrawlHistoryHSQLDao(session: Session):
         AbstractDao<KrawlHistoryEntry, Long>(session,
                 krawlHistoryTable, KrawlHistoryEntry::id, defaultIdStrategy = IdStrategy.Generated) {
 
+    private val logger: Logger = LogManager.getLogger()
+
     init {
         // Create queue table
         session.update("CREATE TABLE IF NOT EXISTS KrawlHistory " +
@@ -57,7 +59,14 @@ class KrawlHistoryHSQLDao(session: Session):
     }
 
     override fun insert(url: KrawlUrl): KrawlHistoryEntry {
-        return insert(KrawlHistoryEntry(-1, url.canonicalForm, LocalDateTime.now()))
+        val retVal = try {
+            insert(KrawlHistoryEntry(-1, url.canonicalForm, LocalDateTime.now()))
+        } catch (e: Throwable) {
+            logger.error("There was an error inserting ${url.canonicalForm} to the KrawlHistory.")
+            KrawlHistoryEntry()
+        }
+
+        return retVal
     }
 
     override fun clearHistory(beforeTime: LocalDateTime): Int {

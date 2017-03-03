@@ -255,12 +255,18 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     // Set of redirect codes
     private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
 
+    /**
+     * Utility function to recover from unhandled runtime exceptions.
+     * Simply logs the exception and then throws the function back to the threadpool for execution.
+     * Primary use case is with the doCrawl method to ensure we don't end prematurely and are getting errors logged.
+     */
     private fun withSafety(fn: () -> Unit) {
         try {
             fn()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             logger.error("Caught exception: ${e::class.qualifiedName}. Message: ${e.message}")
-            threadpool.submit { withSafety(this::doCrawl) }
+            logger.error(e)
+            threadpool.submit { withSafety(fn) }
         }
     }
 
@@ -282,26 +288,20 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                     onRepeatVisit(krawlUrl, parent)
                     threadpool.submit { withSafety(this::doCrawl) }
                     return
-                } else { // If it
-                    try {
-                        krawlHistory!!.insert(krawlUrl)
-                    } catch (e: Exception) {
-                        logger.error("There was an error inserting ${krawlUrl.canonicalForm} to the KrawlHistory.")
-                        KrawlHistoryEntry()
-                    }
+                } else {
+                    krawlHistory!!.insert(krawlUrl)
                 }
 
         // If we're supposed to visit this, get the HTML and call visit
         val visit = shouldVisit(krawlUrl)
         val check = shouldCheck(krawlUrl)
-        if (visit || check) {
 
+        if (visit || check) {
             // If we're respecting robots.txt check if it's ok to visit this page
             if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl)) {
                 threadpool.submit { withSafety(this::doCrawl) }
                 return
             }
-
             // Check if we should continue crawling
             synchronized(syncLock) {
                 if ((++visitCount > config.totalPages) && (config.totalPages > -1)) return
@@ -334,7 +334,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             if (check)
                 check(krawlUrl, doc.statusCode)
         }
-        // Re-schedule doCrawl
+
         threadpool.submit { withSafety(this::doCrawl) }
     }
 

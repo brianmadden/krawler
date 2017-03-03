@@ -170,7 +170,7 @@ class Requests(private val krawlConfig: KrawlConfig,
         val resp: RequestResponse = try {
             val response: HttpResponse? = httpClient!!.execute(req, httpContext)
             if (response == null) ErrorResponse(url) else retFun(url, response, httpContext)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             ErrorResponse(url, e.toString())
         }
 
