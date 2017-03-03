@@ -30,6 +30,8 @@ import io.thelandscape.krawler.http.*
 import io.thelandscape.krawler.robots.RoboMinder
 import io.thelandscape.krawler.robots.RoboMinderIf
 import io.thelandscape.krawler.robots.RobotsConfig
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -54,6 +56,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                                LinkedBlockingQueue<Runnable>(config.maximumQueueSize),
                                NoopTaskRejector())) {
 
+    private val logger: Logger = LogManager.getLogger()
 
     init {
         if (krawlHistory == null || krawlQueues == null) {
@@ -71,6 +74,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 }
 
         }
+        logger.debug("Krawler initialized with ${config.numThreads} threads.")
     }
 
     internal val scheduledQueue: ScheduledQueue = ScheduledQueue(krawlQueues!!, config)
@@ -193,7 +197,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
 
         onCrawlStart()
-        (1..krawlUrls.size).forEach { threadpool.submit { doCrawl() } }
+        (1..krawlUrls.size).forEach { threadpool.submit { withSafety(this::doCrawl) } }
         while(!threadpool.isTerminated && threadpool.activeCount > 0) { Thread.sleep(250) }
         threadpool.shutdown()
         onCrawlEnd()
@@ -245,11 +249,20 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     private val syncLock: Any = Any()
 
     /** This should be utilized within a locked or synchronized block **/
-    @Volatile var visitCount: Int = 0
+    var visitCount: Int = 0
         private set
 
     // Set of redirect codes
     private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
+
+    private fun withSafety(fn: () -> Unit) {
+        try {
+            fn()
+        } catch (e: Exception) {
+            logger.error("Caught exception: ${e::class.qualifiedName}. Message: ${e.message}")
+            threadpool.submit { withSafety(this::doCrawl) }
+        }
+    }
 
     internal fun doCrawl() {
         val entry: KrawlQueueEntry = scheduledQueue.pop() ?: return
@@ -265,9 +278,15 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         val history: KrawlHistoryEntry =
                 if (krawlHistory!!.hasBeenSeen(krawlUrl)) { // If it has been seen
                     onRepeatVisit(krawlUrl, parent)
+                    threadpool.submit { withSafety(this::doCrawl) }
                     return
                 } else { // If it
-                    krawlHistory!!.insert(krawlUrl)
+                    try {
+                        krawlHistory!!.insert(krawlUrl)
+                    } catch (e: Exception) {
+                        logger.error("There was an error inserting ${krawlUrl.canonicalForm} to the KrawlHistory.")
+                        KrawlHistoryEntry()
+                    }
                 }
 
         // If we're supposed to visit this, get the HTML and call visit
@@ -276,8 +295,10 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         if (visit || check) {
 
             // If we're respecting robots.txt check if it's ok to visit this page
-            if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl))
+            if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl)) {
+                threadpool.submit { withSafety(this::doCrawl) }
                 return
+            }
 
             // Check if we should continue crawling
             synchronized(syncLock) {
@@ -289,12 +310,14 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             // If there was an error on trying to get the doc, call content fetch error
             if (doc is ErrorResponse) {
                 onContentFetchError(krawlUrl, doc.reason)
+                threadpool.submit { withSafety(this::doCrawl) }
                 return
             }
 
             // If there was an error parsing the response, still a content fetch error
             if (doc !is KrawlDocument) {
                 onContentFetchError(krawlUrl, "Krawler was unable to parse the response from the server.")
+                threadpool.submit { withSafety(this::doCrawl) }
                 return
             }
 
@@ -310,7 +333,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 check(krawlUrl, doc.statusCode)
         }
         // Re-schedule doCrawl
-        threadpool.submit { doCrawl() }
+        threadpool.submit { withSafety(this::doCrawl) }
     }
 
     /**
@@ -342,12 +365,14 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 // Anchor tags
                 doc.anchorTags
                         .filterNot { it.attr("href").startsWith("#") }
+                        .filter { it.attr("href").length <= 2048 }
                         .map { KrawlUrl.new(it.attr("href"), url) }
                         .filter { it.canonicalForm.isNotBlank() }
                         .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1) },
                 // Everything else (img tags, scripts, etc)d
                 doc.otherOutgoingLinks
                         .filterNot { it.startsWith("#")}
+                        .filter { it.length <= 2048 }
                         .map { KrawlUrl.new(it, url) }
                         .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1)}
         ).flatten()

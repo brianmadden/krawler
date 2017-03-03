@@ -2,7 +2,7 @@
 <Configuration status="WARN">
     <Appenders>
         <RollingFile name="RollingFile" fileName="logs/krawler.log"
-                     filePattern="logs/hcrawl_%i.log.gz">
+                     filePattern="logs/krawler_%i.log.gz">
             <PatternLayout>
                 <Pattern>%d %p %c{1.} [%t] %m%n</Pattern>
             </PatternLayout>
@@ -17,10 +17,12 @@
         </Console>
     </Appenders>
     <Loggers>
+        <Logger name="com.github.andrewoma.kwery.core.interceptor.LoggingInterceptor" level="fatal">
+            <AppenderRef ref="Console" />
+        </Logger>
         <Root level="fatal">
-            <!--<AppenderRef ref="Console" />
-            <AppenderRef ref="RollingFile"/>-->
+            <AppenderRef ref="Console" />
+            <AppenderRef ref="RollingFile"/>
         </Root>
-        <logger name="org.apache.http.client.protocol.ResponseProcessCookies" level="fatal"></logger>
     </Loggers>
 </Configuration>

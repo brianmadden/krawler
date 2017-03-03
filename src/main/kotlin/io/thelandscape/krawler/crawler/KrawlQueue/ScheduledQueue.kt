@@ -22,9 +22,13 @@ import com.google.common.cache.CacheBuilder
 import com.google.common.cache.CacheLoader
 import com.google.common.cache.LoadingCache
 import io.thelandscape.krawler.crawler.KrawlConfig
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
 import java.util.concurrent.TimeUnit
 
 class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config: KrawlConfig) {
+
+    val logger: Logger = LogManager.getLogger()
 
     private val popLock: Any = Any()
     private var popSelector: Int = 0
@@ -77,6 +81,7 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
 
         // Multiply by queue size, we'll check all of the queues each second
         while (entry == null && emptyQueueWaitCount < (config.emptyQueueWaitTime * modVal)) {
+            logger.debug("Waiting on an entry... Wait count: ${emptyQueueWaitCount / modVal}")
             // Wait for the configured period for more URLs
             Thread.sleep(Math.ceil(1000.0 / modVal).toLong())
             emptyQueueWaitCount++
