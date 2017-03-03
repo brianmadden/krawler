@@ -27,7 +27,9 @@ still available to facilitate validation and checking though.
 
 Gradle
 ======
-Krawler is published through jitpack.io at: https://jitpack.io/#brianmadden/krawler/ . Add jitpack.io as a repository, and krawler as a compile time dependency to your `build.gradle` to use Krawler in your project:
+Krawler is published through jitpack.io at: https://jitpack.io/#brianmadden/krawler/ . 
+Add jitpack.io as a repository, and krawler as a compile time dependency to your `build.gradle` 
+to use Krawler in your project:
 
 ```groovy
  repositories {
@@ -35,7 +37,7 @@ Krawler is published through jitpack.io at: https://jitpack.io/#brianmadden/kraw
         maven { url "https://jitpack.io" }
    }
    dependencies {
-         compile 'com.github.brianmadden:krawler:0.3.1'
+         compile 'com.github.brianmadden:krawler:0.3.2'
    }
 
 ```
@@ -91,10 +93,18 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
 Roadmap
 =======
+* Updates to make use of new features in Kotlin 1.1
 * Proxy support
+* Selenium support for crawling Javascript driven sites
 
 Release Notes
 =============
+**0.3.2 (2017-3-3)**
+- Fixed a number of bugs that would result in a crashed thread, and subsequently an incorrect number of crawled pages
+as well as cause slowdowns due to a reduced number of worker threads.
+
+- Added a new utility function to wrap `doCrawl` and log any uncaught exceptions during crawling. 
+
 **0.3.1 (2017-2-2)**
 - Created 1:1 mapping between threads and the number of queues used to serve URLs to visit. URLs have an
 affinity for a particular queue based on their domain. All URLs from that domain will end up in the same
