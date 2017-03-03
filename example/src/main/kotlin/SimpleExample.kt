@@ -57,6 +57,6 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
     }
     override fun onCrawlEnd() {
         endTimestamp = LocalTime.now().toNanoOfDay()
-        println("Crawled $counter pages in ${(endTimestamp - startTimestamp) / 1000000000.0} seconds.")
+        println("Crawled $counter pages in ${(endTimestamp - startTimestamp) / 1000000000.0} seconds. $visitCount")
     }
 }

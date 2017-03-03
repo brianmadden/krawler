@@ -202,7 +202,15 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
             val c = path[idx]
             // Handle normalization of path from here on out
             if (c == '%') {
-                val nextTwoChars: String = path.slice(idx + 1 .. idx + 2)
+                val nextTwoChars: String = if (idx + 1  >= path.length) {
+                    idx++
+                    continue
+                } else if (idx + 2 >= path.length) {
+                    path.slice(idx + 1..path.length)
+                } else {
+                    path.slice(idx + 1..idx + 2)
+                }
+
                 if (nextTwoChars.matches(Regex("[0-9a-fA-F]{2}"))) {
                     val nextTwo: Int = Integer.parseInt(nextTwoChars, 16)
 

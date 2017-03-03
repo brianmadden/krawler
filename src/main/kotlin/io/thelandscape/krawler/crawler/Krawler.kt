@@ -272,8 +272,10 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         val parent: KrawlUrl = KrawlUrl.new(entry.parent.url)
 
         // Make sure we're within depth limit
-        if (depth >= config.maxDepth && config.maxDepth != -1)
+        if (depth >= config.maxDepth && config.maxDepth != -1) {
+            threadpool.submit { withSafety(this::doCrawl) }
             return
+        }
 
         val history: KrawlHistoryEntry =
                 if (krawlHistory!!.hasBeenSeen(krawlUrl)) { // If it has been seen
