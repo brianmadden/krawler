@@ -231,6 +231,16 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         (1..krawlUrls.size).forEach { threadpool.submit { doCrawl() } }
     }
 
+
+    /**
+     * Returns true if the threadpool is still actively running tasks, false otherwise
+     *
+     * @return: true if threadpool is active, false otherwise
+     */
+    fun isActive(): Boolean {
+        return threadpool.activeCount > 0
+    }
+
     /**
      * Attempts to stop Krawler by gracefully shutting down. All current threads will finish
      * executing.
