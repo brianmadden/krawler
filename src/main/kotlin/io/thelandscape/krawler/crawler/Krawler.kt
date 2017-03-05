@@ -35,6 +35,10 @@ import org.apache.logging.log4j.Logger
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.*
+import kotlinx.coroutines.experimental.*
+import kotlinx.coroutines.experimental.sync.Mutex
+import java.util.concurrent.CancellationException
 
 /**
  * Class defines the operations and data structures used to perform a web crawl.
@@ -178,7 +182,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      *
      * @param: seedUrl String: A single seed URL
      */
-    fun start(seedUrl: String) = start(listOf(seedUrl))
+    suspend fun start(seedUrl: String) = start(listOf(seedUrl))
 
     /**
      * Starts the Krawler with the URLs provided. This method will call `onCrawlStart()`
@@ -188,7 +192,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @param: seedUrl List<String>: A list of seed URLs
      *
      */
-    fun start(seedUrl: List<String>) {
+    suspend fun start(seedUrl: List<String>) = runBlocking(CommonPool) {
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
@@ -197,9 +201,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
 
         onCrawlStart()
-        (1..krawlUrls.size).forEach { threadpool.submit { withSafety(this::doCrawl) } }
-        while(!threadpool.isTerminated && threadpool.activeCount > 0) { Thread.sleep(250) }
-        threadpool.shutdown()
+        (1..krawlUrls.size).forEach { async(CommonPool + job) { doCrawl() } }
+        while (job.isActive) { delay(250) }
         onCrawlEnd()
     }
 
@@ -210,7 +213,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      *
      * @param: seedUrl String: A single seed URL
      */
-    fun startNonblocking(seedUrl: String) = startNonblocking(listOf(seedUrl))
+    suspend fun startNonblocking(seedUrl: String) = startNonblocking(listOf(seedUrl))
 
     /**
      * Starts the Krawler with the URLs provided. This method will call `onCrawlStart()`
@@ -219,7 +222,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      *
      * @param: seedUrl List<String>: A list of seed URLs
      */
-    fun startNonblocking(seedUrl: List<String>) {
+    suspend fun startNonblocking(seedUrl: List<String>) {
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
@@ -228,7 +231,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
 
         onCrawlStart()
-        (1..krawlUrls.size).forEach { threadpool.submit { doCrawl() } }
+        (1..krawlUrls.size).forEach { launch(CommonPool + job) { doCrawl() } }
     }
 
 
@@ -256,7 +259,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * Private members
      */
     // Lock for the synchronized block to determine when to stop
-    private val syncLock: Any = Any()
+    private val syncMutex: Mutex = Mutex()
 
     /** This should be utilized within a locked or synchronized block **/
     var visitCount: Int = 0
@@ -265,22 +268,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     // Set of redirect codes
     private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
 
-    /**
-     * Utility function to recover from unhandled runtime exceptions.
-     * Simply logs the exception and then throws the function back to the threadpool for execution.
-     * Primary use case is with the doCrawl method to ensure we don't end prematurely and are getting errors logged.
-     */
-    private fun withSafety(fn: () -> Unit) {
-        try {
-            fn()
-        } catch (e: Throwable) {
-            logger.error("Caught exception: ${e::class.qualifiedName}. Message: ${e.message}")
-            logger.error(e)
-            threadpool.submit { withSafety(fn) }
-        }
-    }
+    private val job: Job = Job()
 
-    internal fun doCrawl() {
+    internal suspend fun doCrawl() {
         val entry: KrawlQueueEntry = scheduledQueue.pop() ?: return
 
         val krawlUrl: KrawlUrl = KrawlUrl.new(entry.url)
@@ -289,14 +279,12 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
         // Make sure we're within depth limit
         if (depth >= config.maxDepth && config.maxDepth != -1) {
-            threadpool.submit { withSafety(this::doCrawl) }
             return
         }
 
         val history: KrawlHistoryEntry =
                 if (krawlHistory!!.hasBeenSeen(krawlUrl)) { // If it has been seen
                     onRepeatVisit(krawlUrl, parent)
-                    threadpool.submit { withSafety(this::doCrawl) }
                     return
                 } else {
                     krawlHistory!!.insert(krawlUrl)
@@ -309,12 +297,20 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         if (visit || check) {
             // If we're respecting robots.txt check if it's ok to visit this page
             if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl)) {
-                threadpool.submit { withSafety(this::doCrawl) }
                 return
             }
             // Check if we should continue crawling
-            synchronized(syncLock) {
-                if ((++visitCount > config.totalPages) && (config.totalPages > -1)) return
+            syncMutex.lock()
+            try {
+                if ((++visitCount > config.totalPages) && (config.totalPages > -1)) {
+                    job.cancel()
+                    return
+                }
+            } catch (e: CancellationException) {
+                logger.info("Hit number of pages, cancelling jobs...")
+                // Do nothing, this is okay
+            } finally {
+                syncMutex.unlock()
             }
 
             val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
@@ -322,20 +318,23 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             // If there was an error on trying to get the doc, call content fetch error
             if (doc is ErrorResponse) {
                 onContentFetchError(krawlUrl, doc.reason)
-                threadpool.submit { withSafety(this::doCrawl) }
                 return
             }
 
             // If there was an error parsing the response, still a content fetch error
             if (doc !is KrawlDocument) {
                 onContentFetchError(krawlUrl, "Krawler was unable to parse the response from the server.")
-                threadpool.submit { withSafety(this::doCrawl) }
                 return
             }
 
             val links = harvestLinks(doc, krawlUrl, history, depth)
-
             scheduledQueue.push(krawlUrl.domain, links)
+
+            (0 until links.size).forEach {
+                launch(CommonPool + job) {
+                    doCrawl()
+                }
+            }
 
             // Finally call visit
             if (visit)
@@ -344,8 +343,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             if (check)
                 check(krawlUrl, doc.statusCode)
         }
-
-        threadpool.submit { withSafety(this::doCrawl) }
     }
 
     /**
@@ -357,7 +354,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      *
      * @return a list of [KrawlQueueEntry] containing the URLs to crawl
      */
-    internal fun harvestLinks(doc: KrawlDocument, url: KrawlUrl,
+    internal suspend fun harvestLinks(doc: KrawlDocument, url: KrawlUrl,
                               history: KrawlHistoryEntry, depth: Int): List<KrawlQueueEntry> {
 
         // Handle redirects by getting the location tag of the header and pushing that into the queue
@@ -367,7 +364,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             val location: KrawlUrl = KrawlUrl.new(locStr, url)
 
             // We won't count it as a visit sinc
-            synchronized(syncLock) { visitCount-- }
+            syncMutex.lock()
+            try { visitCount-- }
+            finally { syncMutex.unlock() }
 
             return listOf(KrawlQueueEntry(location.canonicalForm, history, depth))
         }

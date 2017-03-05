@@ -22,6 +22,9 @@ allprojects {
     repositories {
         mavenCentral()
         jcenter()
+        maven {
+            url "http://dl.bintray.com/kotlin/kotlin-eap-1.1"
+        }
     }
 
     task sourcesJar(type: Jar, dependsOn: classes) {
@@ -43,6 +46,8 @@ allprojects {
 project(":") {
     dependencies {
         compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+        compile 'org.jetbrains.kotlinx:kotlinx-coroutines-core:0.12'
+
         compile "org.apache.httpcomponents:httpclient:4.5.2"
         compile group: 'org.hsqldb', name: 'hsqldb', version: '2.3.4'
 
@@ -71,5 +76,12 @@ project(":example") {
 
     dependencies {
         compile project(":")
+    }
+}
+
+compileKotlin {
+    kotlinOptions {
+        languageVersion = "1.1"
+        apiVersion = "1.1"
     }
 }

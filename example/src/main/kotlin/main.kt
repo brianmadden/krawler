@@ -17,15 +17,18 @@
  */
 
 import io.thelandscape.krawler.crawler.KrawlConfig
+import kotlinx.coroutines.experimental.runBlocking
 
 fun main(args: Array<String>) {
 
-    val config: KrawlConfig = KrawlConfig(totalPages = 200, numThreads = 4)
+    val config: KrawlConfig = KrawlConfig(totalPages = 1000, numThreads = 4)
     val k = SimpleExample(config)
 
     // Add a few different hosts to the whitelist
     val allowedHosts = listOf("en.wikipedia.org", "en.wiktionary.org", "en.wikiquote.org")
     k.whitelist.addAll(allowedHosts)
 
-    k.start(listOf("http://en.wikipedia.org", "http://en.wiktionary.org", "http://en.wikiquote.org"))
+    runBlocking {
+        k.start(listOf("http://en.wikipedia.org", "http://en.wiktionary.org", "http://en.wikiquote.org"))
+    }
 }
