@@ -18,14 +18,15 @@ package io.thelandscape
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import com.nhaarman.mockito_kotlin.*
+import com.nhaarman.mockito_kotlin.any
+import com.nhaarman.mockito_kotlin.mock
+import com.nhaarman.mockito_kotlin.times
+import com.nhaarman.mockito_kotlin.verify
 import io.thelandscape.krawler.crawler.KrawlConfig
-import io.thelandscape.krawler.http.HistoryTrackingRedirectStrategy
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestTracker
 import io.thelandscape.krawler.http.Requests
-import org.apache.http.HttpResponse
-import org.apache.http.client.methods.CloseableHttpResponse
+import kotlinx.coroutines.experimental.runBlocking
 import org.apache.http.client.methods.HttpUriRequest
 import org.apache.http.client.protocol.HttpClientContext
 import org.apache.http.impl.client.CloseableHttpClient
@@ -80,9 +81,9 @@ class RequestTrackerTest {
     val requestTracker: RequestTracker = RequestTracker()
 
     @Test fun testGetLock() {
-        val first = requestTracker.getLock("test")
-        val second = requestTracker.getLock("test")
-        val third = requestTracker.getLock("test2")
+        val first = runBlocking { requestTracker.getLock("test") }
+        val second = runBlocking { requestTracker.getLock("test") }
+        val third = runBlocking { requestTracker.getLock("test2") }
 
         // Test that the same parameter actually gets the same lock
         assertEquals(first, second)

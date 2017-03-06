@@ -30,15 +30,10 @@ import io.thelandscape.krawler.http.*
 import io.thelandscape.krawler.robots.RoboMinder
 import io.thelandscape.krawler.robots.RoboMinderIf
 import io.thelandscape.krawler.robots.RobotsConfig
+import kotlinx.coroutines.experimental.*
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.*
-import kotlinx.coroutines.experimental.*
-import kotlinx.coroutines.experimental.sync.Mutex
-import java.util.concurrent.CancellationException
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Class defines the operations and data structures used to perform a web crawl.
@@ -51,7 +46,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                        private var krawlHistory: KrawlHistoryIf? = null,
                        internal var krawlQueues: List<KrawlQueueIf>? = null,
                        robotsConfig: RobotsConfig? = null,
-                       private val requestProvider: RequestProviderIf = Requests(config)) {
+                       private val requestProvider: RequestProviderIf = Requests(config),
+                       private val job: Job = Job()) {
 
     private val logger: Logger = LogManager.getLogger()
 
@@ -66,17 +62,15 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             val histDao: KrawlHistoryHSQLDao = krawlHistory as KrawlHistoryHSQLDao
 
             if (krawlQueues == null)
-                krawlQueues = (0 until config.numThreads).map {
+                // TODO: Dynamic number of queues? Why 10?
+                krawlQueues = (0 until 10).map {
                     KrawlQueueHSQLDao("queue$it", hsqlConnection.hsqlSession, histDao)
                 }
 
         }
-        logger.debug("Krawler initialized with ${config.numThreads} threads.")
     }
 
     internal val scheduledQueue: ScheduledQueue = ScheduledQueue(krawlQueues!!, config)
-
-    private val job: Job = Job()
 
     /**
      * Handle robots.txt
@@ -248,12 +242,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     /**
      * Private members
      */
-    // Lock for the synchronized block to determine when to stop
-    private val syncMutex: Mutex = Mutex()
-
-    /** This should be utilized within a locked or synchronized block **/
-    var visitCount: Int = 0
-        private set
+    internal val visitCount: AtomicInteger = AtomicInteger(0)
+    internal val finishedCount: AtomicInteger = AtomicInteger(0)
 
     // Set of redirect codes
     private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
@@ -291,15 +281,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 return
             }
 
-
-            syncMutex.lock()
-            try {
-                if ((++visitCount > config.totalPages) && (config.totalPages > -1)) {
-                    return
-                }
-            } finally {
-                syncMutex.unlock()
-            }
+            if ((visitCount.incrementAndGet() > config.totalPages) && (config.totalPages > -1))
+                return
 
             val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
 
@@ -324,15 +307,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
             if (check)
                 check(krawlUrl, doc.statusCode)
-        }
 
-        syncMutex.lock()
-        try {
-            if ((++visitCount > config.totalPages) && (config.totalPages > -1)) {
+            if ((finishedCount.incrementAndGet() == config.totalPages) && (config.totalPages > -1))
                 job.cancel()
-            }
-        } finally {
-            syncMutex.unlock()
         }
 
         launch(CommonPool + job) { doCrawl() }
@@ -357,9 +334,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             val location: KrawlUrl = KrawlUrl.new(locStr, url)
 
             // We won't count it as a visit sinc
-            syncMutex.lock()
-            try { visitCount-- }
-            finally { syncMutex.unlock() }
+            visitCount.decrementAndGet()
 
             return listOf(KrawlQueueEntry(location.canonicalForm, history, depth))
         }
