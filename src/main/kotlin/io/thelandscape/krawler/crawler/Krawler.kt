@@ -51,14 +51,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                        private var krawlHistory: KrawlHistoryIf? = null,
                        internal var krawlQueues: List<KrawlQueueIf>? = null,
                        robotsConfig: RobotsConfig? = null,
-                       private val requestProvider: RequestProviderIf = Requests(config),
-                       private val threadpool: ThreadPoolExecutor = ThreadPoolExecutor(
-                               config.numThreads,
-                               config.numThreads,
-                               config.emptyQueueWaitTime,
-                               TimeUnit.SECONDS,
-                               LinkedBlockingQueue<Runnable>(config.maximumQueueSize),
-                               NoopTaskRejector())) {
+                       private val requestProvider: RequestProviderIf = Requests(config)) {
 
     private val logger: Logger = LogManager.getLogger()
 
@@ -82,6 +75,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     }
 
     internal val scheduledQueue: ScheduledQueue = ScheduledQueue(krawlQueues!!, config)
+
+    private val job: Job = Job()
 
     /**
      * Handle robots.txt
@@ -192,7 +187,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @param: seedUrl List<String>: A list of seed URLs
      *
      */
-    suspend fun start(seedUrl: List<String>) = runBlocking(CommonPool) {
+    fun start(seedUrl: List<String>) = runBlocking(CommonPool) {
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
@@ -201,8 +196,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
 
         onCrawlStart()
-        (1..krawlUrls.size).forEach { async(CommonPool + job) { doCrawl() } }
-        while (job.isActive) { delay(250) }
+        (1..100).map { launch(CommonPool + job) { doCrawl() } }
+        while(job.isActive) { delay(250) }
         onCrawlEnd()
     }
 
@@ -241,19 +236,14 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @return: true if threadpool is active, false otherwise
      */
     fun isActive(): Boolean {
-        return threadpool.activeCount > 0
+        return job.isActive
     }
 
     /**
      * Attempts to stop Krawler by gracefully shutting down. All current threads will finish
      * executing.
      */
-    fun stop() = threadpool.shutdown()
-
-    /**
-     * Attempts to stop Krawler by forcing a shutdown. Threads may be killed mid-execution.
-     */
-    fun shutdown(): MutableList<Runnable> = threadpool.shutdownNow()
+    fun stop() = job.cancel()
 
     /**
      * Private members
@@ -267,10 +257,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
     // Set of redirect codes
     private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
-
-    private val job: Job = Job()
-
     internal suspend fun doCrawl() {
+
         val entry: KrawlQueueEntry = scheduledQueue.pop() ?: return
 
         val krawlUrl: KrawlUrl = KrawlUrl.new(entry.url)
@@ -279,12 +267,14 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
         // Make sure we're within depth limit
         if (depth >= config.maxDepth && config.maxDepth != -1) {
+            launch(CommonPool + job) { doCrawl() }
             return
         }
 
         val history: KrawlHistoryEntry =
                 if (krawlHistory!!.hasBeenSeen(krawlUrl)) { // If it has been seen
                     onRepeatVisit(krawlUrl, parent)
+                    launch(CommonPool + job) { doCrawl() }
                     return
                 } else {
                     krawlHistory!!.insert(krawlUrl)
@@ -297,18 +287,16 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         if (visit || check) {
             // If we're respecting robots.txt check if it's ok to visit this page
             if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl)) {
+                launch(CommonPool + job) { doCrawl() }
                 return
             }
-            // Check if we should continue crawling
+
+
             syncMutex.lock()
             try {
                 if ((++visitCount > config.totalPages) && (config.totalPages > -1)) {
-                    job.cancel()
                     return
                 }
-            } catch (e: CancellationException) {
-                logger.info("Hit number of pages, cancelling jobs...")
-                // Do nothing, this is okay
             } finally {
                 syncMutex.unlock()
             }
@@ -330,12 +318,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             val links = harvestLinks(doc, krawlUrl, history, depth)
             scheduledQueue.push(krawlUrl.domain, links)
 
-            (0 until links.size).forEach {
-                launch(CommonPool + job) {
-                    doCrawl()
-                }
-            }
-
             // Finally call visit
             if (visit)
                 visit(krawlUrl, doc)
@@ -343,6 +325,17 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             if (check)
                 check(krawlUrl, doc.statusCode)
         }
+
+        syncMutex.lock()
+        try {
+            if ((++visitCount > config.totalPages) && (config.totalPages > -1)) {
+                job.cancel()
+            }
+        } finally {
+            syncMutex.unlock()
+        }
+
+        launch(CommonPool + job) { doCrawl() }
     }
 
     /**

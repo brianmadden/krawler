@@ -20,6 +20,11 @@ package io.thelandscape.krawler.http
 
 import io.thelandscape.krawler.crawler.KrawlConfig
 import io.thelandscape.krawler.robots.RobotsTxt
+import kotlinx.coroutines.experimental.CommonPool
+import kotlinx.coroutines.experimental.async
+import kotlinx.coroutines.experimental.launch
+import kotlinx.coroutines.experimental.runBlocking
+import kotlinx.coroutines.experimental.sync.Mutex
 import org.apache.http.HttpRequest
 import org.apache.http.HttpResponse
 import org.apache.http.client.config.CookieSpecs
@@ -119,7 +124,7 @@ class Requests(private val krawlConfig: KrawlConfig,
      */
     override fun fetchRobotsTxt(url: KrawlUrl): RequestResponse {
         val robotsRequest = KrawlUrl.new("${url.hierarchicalPart}/robots.txt")
-        return makeRequest(robotsRequest, ::HttpGet, ::RobotsTxt)
+        return runBlocking(CommonPool) { makeRequest(robotsRequest, ::HttpGet, ::RobotsTxt) }
     }
 
     /** Check a URL and return it's status code
@@ -127,14 +132,18 @@ class Requests(private val krawlConfig: KrawlConfig,
      *
      * @return [RequestResponse]: KrawlDocument containing the status code, or ErrorResponse on error
      */
-   override fun checkUrl(url: KrawlUrl): RequestResponse = makeRequest(url, ::HttpHead, ::KrawlDocument)
+   override fun checkUrl(url: KrawlUrl): RequestResponse = runBlocking(CommonPool) {
+        makeRequest(url, ::HttpHead, ::KrawlDocument)
+    }
 
     /** Get the contents of a URL
      * @param url KrawlUrl: the URL to get the contents of
      *
      * @return [RequestResponse]: The parsed HttpResponse returned by the GET request
      */
-    override fun getUrl(url: KrawlUrl): RequestResponse = makeRequest(url, ::HttpGet, ::KrawlDocument)
+    override fun getUrl(url: KrawlUrl): RequestResponse = runBlocking(CommonPool) {
+        makeRequest(url, ::HttpGet, ::KrawlDocument)
+    }
 
     // Hash map to track requests and respect politeness
     private val requestTracker: RequestTracker = RequestTracker()
@@ -144,9 +153,9 @@ class Requests(private val krawlConfig: KrawlConfig,
      * @param reqFun: Function used to construct the request
      * @param retFun: Function used to construct the response object
      */
-    private fun makeRequest(url: KrawlUrl,
-                            reqFun: (String) -> HttpUriRequest,
-                            retFun: (KrawlUrl, HttpResponse, HttpClientContext) -> RequestResponse): RequestResponse {
+    private suspend fun makeRequest(url: KrawlUrl,
+                                    reqFun: (String) -> HttpUriRequest,
+                                    retFun: (KrawlUrl, HttpResponse, HttpClientContext) -> RequestResponse): RequestResponse {
 
         val httpContext = HttpClientContext()
         httpContext.setAttribute("fullRedirectHistory", listOf<RedirectHistoryNode>())
@@ -157,13 +166,17 @@ class Requests(private val krawlConfig: KrawlConfig,
         // Handle politeness
 
         if (krawlConfig.politenessDelay > 0) {
-            synchronized(requestTracker.getLock(host)) {
+            val myLock = requestTracker.getLock(host)
+            myLock.lock()
+            try {
                 val reqDelta = Instant.now().toEpochMilli() - requestTracker.getTimestamp(host)
                 if (reqDelta >= 0 && reqDelta < krawlConfig.politenessDelay)
                 // Sleep until the remainder of the politeness delay has elapsed
                     Thread.sleep(krawlConfig.politenessDelay - reqDelta)
                 // Set last request time for politeness
                 requestTracker.setTimestamp(host, Instant.now().toEpochMilli())
+            } finally {
+                myLock.unlock()
             }
         }
 
@@ -184,8 +197,8 @@ class Requests(private val krawlConfig: KrawlConfig,
  */
 class RequestTracker {
 
-    private val lockMapLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
-    private val lockMap: MutableMap<String, Any> = mutableMapOf()
+    private val lockMapLock: Mutex = Mutex()
+    private val lockMap: MutableMap<String, Mutex> = mutableMapOf()
     private val timestampMap: MutableMap<String, Long> = mutableMapOf()
 
     /**
@@ -195,11 +208,11 @@ class RequestTracker {
      * Note: This operation -IS- threadsafe.
      *
      * @param host String: The host that this lock will be associated with.
-     * @return the [Any] object that will lock the synchronized section
+     * @return the [Mutex] object that will lock the synchronized section
      */
-    fun getLock(host: String): Any {
-        return lockMapLock.read { lockMap[host] } ?:
-                lockMapLock.write { lockMap.getOrPut(host, { Any() }) }
+    suspend fun getLock(host: String): Mutex {
+        lockMapLock.lock()
+        return try { lockMap[host] ?: lockMap.getOrPut(host, { Mutex() }) } finally {lockMapLock.unlock() }
     }
 
     /**
