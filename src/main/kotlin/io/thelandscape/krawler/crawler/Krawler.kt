@@ -171,7 +171,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      *
      * @param: seedUrl String: A single seed URL
      */
-    suspend fun start(seedUrl: String) = start(listOf(seedUrl))
+    fun start(seedUrl: String) = start(listOf(seedUrl))
 
     /**
      * Starts the Krawler with the URLs provided. This method will call `onCrawlStart()`
@@ -202,7 +202,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      *
      * @param: seedUrl String: A single seed URL
      */
-    suspend fun startNonblocking(seedUrl: String) = startNonblocking(listOf(seedUrl))
+    fun startNonblocking(seedUrl: String) = startNonblocking(listOf(seedUrl))
 
     /**
      * Starts the Krawler with the URLs provided. This method will call `onCrawlStart()`
@@ -211,7 +211,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      *
      * @param: seedUrl List<String>: A list of seed URLs
      */
-    suspend fun startNonblocking(seedUrl: List<String>) {
+    fun startNonblocking(seedUrl: List<String>) = runBlocking(CommonPool) {
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
@@ -220,7 +220,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
 
         onCrawlStart()
-        (1..krawlUrls.size).forEach { launch(CommonPool + job) { doCrawl() } }
+        (1..100).map { launch(CommonPool + job) { doCrawl() } }
     }
 
 
