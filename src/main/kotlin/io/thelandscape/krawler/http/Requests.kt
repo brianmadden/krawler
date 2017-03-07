@@ -212,7 +212,11 @@ class RequestTracker {
      */
     suspend fun getLock(host: String): Mutex {
         lockMapLock.lock()
-        return try { lockMap[host] ?: lockMap.getOrPut(host, { Mutex() }) } finally {lockMapLock.unlock() }
+        return try {
+            lockMap[host] ?: lockMap.getOrPut(host, { Mutex() })
+        } finally {
+            lockMapLock.unlock()
+        }
     }
 
     /**

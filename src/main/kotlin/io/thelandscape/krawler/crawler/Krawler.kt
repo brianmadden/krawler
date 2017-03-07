@@ -308,8 +308,10 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             if (check)
                 check(krawlUrl, doc.statusCode)
 
-            if ((finishedCount.incrementAndGet() == config.totalPages) && (config.totalPages > -1))
+            if ((finishedCount.incrementAndGet() == config.totalPages) && (config.totalPages > -1)) {
                 job.cancel()
+                return
+            }
         }
 
         launch(CommonPool + job) { doCrawl() }

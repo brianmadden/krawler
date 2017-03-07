@@ -41,7 +41,7 @@ import kotlin.test.assertTrue
 class KrawlerTest {
 
     val exampleUrl = KrawlUrl.new("http://www.example.org")
-    val mockConfig = KrawlConfig(emptyQueueWaitTime = 1, totalPages = 5)
+    val mockConfig = KrawlConfig(emptyQueueWaitTime = 1, totalPages = 1)
     val mockHistory = mock<KrawlHistoryIf>()
     val mockQueue = listOf(mock<KrawlQueueIf>())
     val mockRequests = mock<RequestProviderIf>()
@@ -102,17 +102,17 @@ class KrawlerTest {
         // Get it started
         runBlocking { testKrawler.doCrawl() }
 
-        verify(mockQueue[0], atLeastOnce()).pop()
+        verify(mockQueue[0], times(1)).pop()
         // Verify that isSafeToVisit was called, minding robots.txt
-        verify(mockMinder, atLeastOnce()).isSafeToVisit(KrawlUrl.new("http://www.test.com"))
+        verify(mockMinder, times(1)).isSafeToVisit(KrawlUrl.new("http://www.test.com"))
         // Ensure we've called to verify this is a unique URL
-        verify(mockHistory, atLeastOnce()).hasBeenSeen(any())
+        verify(mockHistory, times(1)).hasBeenSeen(any())
         // Now verify that we insert the URL to the history
-        verify(mockHistory, atLeastOnce()).insert(any())
+        verify(mockHistory, times(1)).insert(any())
 
         // The global visit count should also be 1
-        assertEquals(5, testKrawler.visitCount.get())
-        assertEquals(5, testKrawler.finishedCount.get())
+        assertEquals(1, testKrawler.visitCount.get())
+        assertEquals(1, testKrawler.finishedCount.get())
     }
 
     @Test fun testHarvestLinks() {
