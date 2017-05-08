@@ -33,6 +33,7 @@ import io.thelandscape.krawler.robots.RobotsConfig
 import kotlinx.coroutines.experimental.*
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -68,6 +69,12 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 }
 
         }
+
+        job.invokeOnCompletion {
+            logger.debug("Ending here... (job is no longer active)!!!!")
+            onCrawlEnd()
+        }
+
     }
 
     internal val scheduledQueue: ScheduledQueue = ScheduledQueue(krawlQueues!!, config)
@@ -190,9 +197,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
 
         onCrawlStart()
-        (1..100).map { launch(CommonPool + job) { doCrawl() } }
-        while(job.isActive) { delay(250) }
-        onCrawlEnd()
+        (1..100).map { schedule() }
+        job.join()
     }
 
     /**
@@ -220,7 +226,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
 
         onCrawlStart()
-        (1..100).map { launch(CommonPool + job) { doCrawl() } }
+        (1..100).map { schedule() }
     }
 
 
@@ -242,8 +248,18 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     /**
      * Private members
      */
+
+    internal fun schedule() = launch(CommonPool + job) {
+        try { doCrawl() }
+        catch(e: Throwable) {
+            logger.debug(e.printStackTrace())
+            visitCount.decrementAndGet()
+        }
+    }
+
     internal val visitCount: AtomicInteger = AtomicInteger(0)
     internal val finishedCount: AtomicInteger = AtomicInteger(0)
+    internal val wasShutdown: AtomicBoolean = AtomicBoolean(false)
 
     // Set of redirect codes
     private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
@@ -257,14 +273,16 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
         // Make sure we're within depth limit
         if (depth >= config.maxDepth && config.maxDepth != -1) {
-            launch(CommonPool + job) { doCrawl() }
+
+            logger.debug("Max depth!")
             return
         }
 
         val history: KrawlHistoryEntry =
                 if (krawlHistory!!.hasBeenSeen(krawlUrl)) { // If it has been seen
                     onRepeatVisit(krawlUrl, parent)
-                    launch(CommonPool + job) { doCrawl() }
+                    schedule()
+                    logger.debug("History says no")
                     return
                 } else {
                     krawlHistory!!.insert(krawlUrl)
@@ -277,24 +295,31 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         if (visit || check) {
             // If we're respecting robots.txt check if it's ok to visit this page
             if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl)) {
-                launch(CommonPool + job) { doCrawl() }
+                schedule()
+                logger.debug("Robots says no")
                 return
             }
 
-            if ((visitCount.incrementAndGet() > config.totalPages) && (config.totalPages > -1))
+            if ((visitCount.incrementAndGet() > config.totalPages) && (config.totalPages > -1)) {
+                logger.debug("Max visit limit reached")
                 return
+            }
 
             val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
 
             // If there was an error on trying to get the doc, call content fetch error
             if (doc is ErrorResponse) {
                 onContentFetchError(krawlUrl, doc.reason)
+                schedule()
+                logger.debug("Content fetch error!")
                 return
             }
 
             // If there was an error parsing the response, still a content fetch error
             if (doc !is KrawlDocument) {
                 onContentFetchError(krawlUrl, "Krawler was unable to parse the response from the server.")
+                schedule()
+                logger.debug("content fetch error2")
                 return
             }
 
@@ -309,12 +334,18 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 check(krawlUrl, doc.statusCode)
 
             if ((finishedCount.incrementAndGet() == config.totalPages) && (config.totalPages > -1)) {
-                job.cancel()
+                logger.debug("cancelling jobs")
+                if (!wasShutdown.getAndSet(true))
+                    try {
+                        job.cancel()
+                    } catch (e: CancellationException) {
+                        // Do nothing
+                    }
                 return
             }
         }
 
-        launch(CommonPool + job) { doCrawl() }
+        schedule()
     }
 
     /**

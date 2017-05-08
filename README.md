@@ -1,5 +1,5 @@
-[![Release](https://jitpack.io/v/brianmadden/krawler.svg)]
-(https://jitpack.io/#brianmadden/krawler) [![Build Status](https://travis-ci.org/brianmadden/krawler.svg?branch=master)](https://travis-ci.org/brianmadden/krawler)
+[![Release](https://jitpack.io/v/brianmadden/krawler.svg)](https://jitpack.io/#brianmadden/krawler) 
+[![Build Status](https://travis-ci.org/brianmadden/krawler.svg?branch=master)](https://travis-ci.org/brianmadden/krawler)
 
 About
 =====
