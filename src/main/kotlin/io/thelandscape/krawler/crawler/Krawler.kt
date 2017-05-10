@@ -40,7 +40,11 @@ import java.util.concurrent.atomic.AtomicInteger
  * Class defines the operations and data structures used to perform a web crawl.
  *
  * @param config: A KrawlConfig object to control the limits and settings of the crawler
- * @param queue: A KrawlQueueIf provider, by default this will be a HSQL backed queue defined in the Dao
+ * @param krawlHistory: KrawlHistoryIf provider, by default this will be a HSQL backed table
+ * @param krawlQueues: A KrawlQueueIf provider, by default this will be a HSQL backed queue
+ * @param robotsConfig: Configuration of the robots.txt management
+ * @param requestProvider: RequestProviderIf provider, default is Requests class
+ * @param job: Job context that threads will run in.
  *
  */
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
@@ -305,7 +309,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 return
             }
 
-            val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
+            val doc: RequestResponse = requestProvider.getUrl(krawlUrl).await()
 
             // If there was an error on trying to get the doc, call content fetch error
             if (doc is ErrorResponse) {

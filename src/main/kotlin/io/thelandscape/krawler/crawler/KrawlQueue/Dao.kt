@@ -27,6 +27,7 @@ import com.github.andrewoma.kwery.mapper.*
 import com.github.andrewoma.kwery.mapper.util.camelToLowerUnderscore
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.History.KrawlHistoryHSQLDao
+import kotlinx.coroutines.experimental.sync.Mutex
 import java.util.concurrent.TimeUnit
 
 object historyConverter :
@@ -61,8 +62,8 @@ class KrawlQueueHSQLDao(name: String,
                 "(url VARCHAR(2048) NOT NULL, parent INT, depth INT, timestamp TIMESTAMP)")
     }
 
-    private val syncLock = Any()
-    override fun pop(): KrawlQueueEntry? {
+    private val syncMutex = Mutex()
+    override suspend fun pop(): KrawlQueueEntry? {
         val historyEntry = Type(KrawlHistoryEntry::id, { histDao.findByIds(it) })
         val queueEntry = Type(
                 KrawlQueueEntry::url,
@@ -76,16 +77,19 @@ class KrawlQueueHSQLDao(name: String,
         val selectSql = "SELECT TOP 1 $columns FROM ${table.name}"
         var out: List<KrawlQueueEntry> = listOf()
         // Synchronize this to prevent race conditions between popping and deleting
-        synchronized(syncLock) {
+        try {
+            syncMutex.lock()
             out = session.select(selectSql, mapper = table.rowMapper())
             if (out.isNotEmpty())
                 session.update("DELETE FROM ${table.name} WHERE url = :id", mapOf("id" to out.first().url))
+        } finally {
+            syncMutex.unlock()
         }
 
         return out.fetch(Node.all).firstOrNull()
     }
 
-    override fun push(urls: List<KrawlQueueEntry>): List<KrawlQueueEntry> {
+    override suspend fun push(urls: List<KrawlQueueEntry>): List<KrawlQueueEntry> {
         if (urls.isNotEmpty())
             return this.batchInsert(urls)
 

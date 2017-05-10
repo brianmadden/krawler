@@ -20,10 +20,7 @@ package io.thelandscape.krawler.http
 
 import io.thelandscape.krawler.crawler.KrawlConfig
 import io.thelandscape.krawler.robots.RobotsTxt
-import kotlinx.coroutines.experimental.CommonPool
-import kotlinx.coroutines.experimental.async
-import kotlinx.coroutines.experimental.launch
-import kotlinx.coroutines.experimental.runBlocking
+import kotlinx.coroutines.experimental.*
 import kotlinx.coroutines.experimental.sync.Mutex
 import org.apache.http.HttpRequest
 import org.apache.http.HttpResponse
@@ -51,17 +48,17 @@ interface RequestProviderIf {
     /**
      * Method to check the status code of a URL
      */
-    fun checkUrl(url: KrawlUrl): RequestResponse
+    fun checkUrl(url: KrawlUrl): Deferred<RequestResponse>
 
     /**
      * Method to get the contents of a URL
      */
-    fun getUrl(url: KrawlUrl): RequestResponse
+    fun getUrl(url: KrawlUrl): Deferred<RequestResponse>
 
     /**
      * Method to get a robots.txt from a KrawlUrl
      */
-    fun fetchRobotsTxt(url: KrawlUrl): RequestResponse
+    fun fetchRobotsTxt(url: KrawlUrl): Deferred<RequestResponse>
 }
 
 internal class HistoryTrackingRedirectStrategy: DefaultRedirectStrategy() {
@@ -120,20 +117,20 @@ class Requests(private val krawlConfig: KrawlConfig,
     /** Fetch the robots.txt file from a domain
      * @param url [KrawlUrl]: The URL to fetch robots from
      *
-     * @return [RequestResponse]: The parsed robots.txt or, or ErrorResponse on error
+     * @return [Deferred<RequestResponse>]: The parsed robots.txt or, or ErrorResponse on error
      */
-    override fun fetchRobotsTxt(url: KrawlUrl): RequestResponse {
+    override fun fetchRobotsTxt(url: KrawlUrl): Deferred<RequestResponse> {
         val robotsRequest = KrawlUrl.new("${url.hierarchicalPart}/robots.txt")
-        return runBlocking(CommonPool) { makeRequest(robotsRequest, ::HttpGet, ::RobotsTxt) }
+        return makeRequest(robotsRequest, ::HttpGet, ::RobotsTxt)
     }
 
     /** Check a URL and return it's status code
      * @param url KrawlUrl: the url to check
      *
-     * @return [RequestResponse]: KrawlDocument containing the status code, or ErrorResponse on error
+     * @return [Deferred<RequestResponse>]: KrawlDocument containing the status code, or ErrorResponse on error
      */
-   override fun checkUrl(url: KrawlUrl): RequestResponse = runBlocking(CommonPool) {
-        makeRequest(url, ::HttpHead, ::KrawlDocument)
+   override fun checkUrl(url: KrawlUrl): Deferred<RequestResponse> {
+        return makeRequest(url, ::HttpHead, ::KrawlDocument)
     }
 
     /** Get the contents of a URL
@@ -141,8 +138,8 @@ class Requests(private val krawlConfig: KrawlConfig,
      *
      * @return [RequestResponse]: The parsed HttpResponse returned by the GET request
      */
-    override fun getUrl(url: KrawlUrl): RequestResponse = runBlocking(CommonPool) {
-        makeRequest(url, ::HttpGet, ::KrawlDocument)
+    override fun getUrl(url: KrawlUrl): Deferred<RequestResponse> {
+        return makeRequest(url, ::HttpGet, ::KrawlDocument)
     }
 
     // Hash map to track requests and respect politeness
@@ -153,9 +150,10 @@ class Requests(private val krawlConfig: KrawlConfig,
      * @param reqFun: Function used to construct the request
      * @param retFun: Function used to construct the response object
      */
-    private suspend fun makeRequest(url: KrawlUrl,
-                                    reqFun: (String) -> HttpUriRequest,
-                                    retFun: (KrawlUrl, HttpResponse, HttpClientContext) -> RequestResponse): RequestResponse {
+    private fun makeRequest(url: KrawlUrl,
+                            reqFun: (String) -> HttpUriRequest,
+                            retFun: (KrawlUrl, HttpResponse, HttpClientContext) -> RequestResponse)
+            : Deferred<RequestResponse> = async(CommonPool) {
 
         val httpContext = HttpClientContext()
         httpContext.setAttribute("fullRedirectHistory", listOf<RedirectHistoryNode>())
@@ -187,7 +185,7 @@ class Requests(private val krawlConfig: KrawlConfig,
             ErrorResponse(url, e.toString())
         }
 
-        return resp
+        resp
     }
 }
 

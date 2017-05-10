@@ -22,21 +22,18 @@ import com.google.common.cache.CacheBuilder
 import com.google.common.cache.CacheLoader
 import com.google.common.cache.LoadingCache
 import io.thelandscape.krawler.crawler.KrawlConfig
-import kotlinx.coroutines.experimental.*
-import kotlinx.coroutines.experimental.sync.Mutex
+import kotlinx.coroutines.experimental.delay
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config: KrawlConfig) {
 
     val logger: Logger = LogManager.getLogger()
 
-    private val popLock: Mutex = Mutex()
-    private var popSelector: Int = 0
-
-    private val pushLock: Mutex = Mutex()
-    private var pushSelector: Int = 0
+    private var popSelector: AtomicInteger = AtomicInteger(0)
+    private val pushSelector: AtomicInteger = AtomicInteger(0)
 
     private val pushAffinityCache: LoadingCache<String, Int> = CacheBuilder.newBuilder()
             .maximumSize(1000)
@@ -44,11 +41,7 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
             .build(
                     object : CacheLoader<String, Int>() {
                         override fun load(key: String): Int {
-                            return runBlocking(CommonPool) {
-                                pushLock.lock()
-                                try { pushSelector++ % queues.size }
-                                finally {pushLock.unlock()}
-                            }
+                            return pushSelector.incrementAndGet() % queues.size
                         }
                     }
             )
@@ -77,18 +70,12 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
         var emptyQueueWaitCount: Long = 0
 
         // This should only be 0 in the case of testing, so this is kind of a hack
-        val modVal = if (pushSelector > queues.size || pushSelector == 0)
+        val modVal = if (pushSelector.get() > queues.size || pushSelector.get() == 0)
             queues.size
         else
-            pushSelector
+            pushSelector.get()
 
-        // Pop a URL off the queue
-        popLock.lock()
-        var entry: KrawlQueueEntry? = try {
-            queues[popSelector++ % modVal].pop()
-        } finally {
-            popLock.unlock()
-        }
+        var entry: KrawlQueueEntry? = queues[popSelector.incrementAndGet() % modVal].pop()
 
         // Multiply by queue size, we'll check all of the queues each second
         while (entry == null && emptyQueueWaitCount < (config.emptyQueueWaitTime * modVal)) {
@@ -97,13 +84,7 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
             delay(Math.ceil(1000.0 / modVal).toLong())
             emptyQueueWaitCount++
 
-            // Try to pop again
-            popLock.lock()
-            entry = try {
-                queues[popSelector++ % modVal].pop()
-            } finally {
-                popLock.unlock()
-            }
+            entry = queues[popSelector.incrementAndGet() % modVal].pop()
         }
 
         return entry

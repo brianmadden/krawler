@@ -24,7 +24,7 @@ import com.google.common.cache.LoadingCache
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestProviderIf
 import io.thelandscape.krawler.http.RequestResponse
-import io.thelandscape.krawler.http.Requests
+import kotlinx.coroutines.experimental.Deferred
 
 interface RoboMinderIf {
     fun isSafeToVisit(url: KrawlUrl): Boolean
@@ -44,17 +44,20 @@ class RoboMinder(private val userAgent: String,
             .build(
                     object : CacheLoader<String, (String) -> Boolean>() {
                         override fun load(key: String): ((String) -> Boolean) {
-                            val resp: RequestResponse = fetch(key)
-                            return process(resp)
+                            val resp: Deferred<RequestResponse> = fetch(key)
+                            while(resp.isActive) { Thread.sleep(250) }
+                            return process(resp.getCompleted())
                         }
                     }
             )
 
 
-    internal fun fetch(host: String): RequestResponse {
+    internal fun fetch(host: String): Deferred<RequestResponse> {
         val robotsUrl = KrawlUrl.new("$host/robots.txt")
         return request.fetchRobotsTxt(robotsUrl)
     }
+
+
 
     /**
      * Process the freshly fetched robots.txt. If there are no rules pertinent to us, we'll just return null
