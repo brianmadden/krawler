@@ -22,6 +22,6 @@ package io.thelandscape.krawler.crawler.KrawlQueue
  * Interface representing a KrawlQueue
  */
 interface KrawlQueueIf {
-    suspend fun pop (): KrawlQueueEntry?
-    suspend fun push (urls: List<KrawlQueueEntry>): List<KrawlQueueEntry>
+    fun pop (): KrawlQueueEntry?
+    fun push (urls: List<KrawlQueueEntry>): List<KrawlQueueEntry>
 }

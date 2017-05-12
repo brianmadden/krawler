@@ -31,9 +31,9 @@ import io.thelandscape.krawler.robots.RoboMinder
 import io.thelandscape.krawler.robots.RoboMinderIf
 import io.thelandscape.krawler.robots.RobotsConfig
 import kotlinx.coroutines.experimental.*
+import kotlinx.coroutines.experimental.channels.*
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -201,7 +201,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
 
         onCrawlStart()
-        (1..100).map { schedule() }
+        val urls: ProducerJob<KrawlQueueEntry> = produceUrls()
+        val actions: ProducerJob<KrawlAction> = produceKrawlActions(urls)
+        doCrawl(actions)
         job.join()
     }
 
@@ -230,7 +232,10 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
 
         onCrawlStart()
-        (1..100).map { schedule() }
+        val urls: ProducerJob<KrawlQueueEntry> = produceUrls()
+        val actions: ProducerJob<KrawlAction> = produceKrawlActions(urls)
+        doCrawl(actions)
+        onCrawlEnd()
     }
 
 
@@ -253,41 +258,69 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * Private members
      */
 
-    internal fun schedule() = launch(CommonPool + job) {
-        try { doCrawl() }
-        catch(e: Throwable) {
-            logger.debug(e.printStackTrace())
-            visitCount.decrementAndGet()
-        }
+    sealed class KrawlAction {
+        data class Visit(val krawlUrl: KrawlUrl, val doc: KrawlDocument): KrawlAction()
+        data class Check(val krawlUrl: KrawlUrl, val statusCode: Int): KrawlAction()
+        class Noop: KrawlAction()
     }
+
 
     internal val visitCount: AtomicInteger = AtomicInteger(0)
     internal val finishedCount: AtomicInteger = AtomicInteger(0)
-    internal val wasShutdown: AtomicBoolean = AtomicBoolean(false)
 
-    // Set of redirect codes
-    private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
-    internal suspend fun doCrawl() {
+    suspend fun produceUrls(): ProducerJob<KrawlQueueEntry> = produce(CommonPool + job) {
+        while(true) {
+            val entry: KrawlQueueEntry? = scheduledQueue.pop()
 
-        val entry: KrawlQueueEntry = scheduledQueue.pop() ?: return
+            if (entry == null) {
+                channel.close()
+                logger.debug("Closing produceUrls")
+                break
+            }
 
-        val krawlUrl: KrawlUrl = KrawlUrl.new(entry.url)
-        val depth: Int = entry.depth
-        val parent: KrawlUrl = KrawlUrl.new(entry.parent.url)
+            logger.debug("Sending ${entry.url}")
+            send(entry)
+        }
+    }
+
+    suspend fun produceKrawlActions(entries: ReceiveChannel<KrawlQueueEntry>): ProducerJob<KrawlAction>
+            = produce(CommonPool + job) {
+
+        var visited: Int = 0
+
+        entries.consumeEach { (url, parent, depth) ->
+            if (visited == config.totalPages && config.totalPages > 0) {
+                logger.debug("Closing produceKrawlActions")
+                channel.close()
+                stop()
+            }
+
+            val krawlUrl: KrawlUrl = KrawlUrl.new(url)
+            val parentKrawlUrl: KrawlUrl = KrawlUrl.new(parent.url)
+
+            val action: KrawlAction  = fetch(krawlUrl, depth, parentKrawlUrl).await()
+
+            if (action !is KrawlAction.Noop)
+                visited++
+
+            send(action)
+        }
+    }
+
+    fun fetch(krawlUrl: KrawlUrl, depth: Int, parent: KrawlUrl): Deferred<KrawlAction> = async(CommonPool + job) {
 
         // Make sure we're within depth limit
         if (depth >= config.maxDepth && config.maxDepth != -1) {
-
             logger.debug("Max depth!")
-            return
+            return@async KrawlAction.Noop()
         }
 
+        // Do a history check
         val history: KrawlHistoryEntry =
                 if (krawlHistory!!.hasBeenSeen(krawlUrl)) { // If it has been seen
                     onRepeatVisit(krawlUrl, parent)
-                    schedule()
                     logger.debug("History says no")
-                    return
+                    return@async KrawlAction.Noop()
                 } else {
                     krawlHistory!!.insert(krawlUrl)
                 }
@@ -299,57 +332,51 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         if (visit || check) {
             // If we're respecting robots.txt check if it's ok to visit this page
             if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl)) {
-                schedule()
                 logger.debug("Robots says no")
-                return
+                return@async KrawlAction.Noop()
             }
 
-            if ((visitCount.incrementAndGet() > config.totalPages) && (config.totalPages > -1)) {
-                logger.debug("Max visit limit reached")
-                return
+            val doc: RequestResponse = if (visit) {
+                requestProvider.getUrl(krawlUrl).await()
+            } else {
+                requestProvider.checkUrl(krawlUrl).await()
             }
-
-            val doc: RequestResponse = requestProvider.getUrl(krawlUrl).await()
 
             // If there was an error on trying to get the doc, call content fetch error
             if (doc is ErrorResponse) {
                 onContentFetchError(krawlUrl, doc.reason)
-                schedule()
                 logger.debug("Content fetch error!")
-                return
+                return@async KrawlAction.Noop()
             }
 
             // If there was an error parsing the response, still a content fetch error
             if (doc !is KrawlDocument) {
                 onContentFetchError(krawlUrl, "Krawler was unable to parse the response from the server.")
-                schedule()
                 logger.debug("content fetch error2")
-                return
+                return@async KrawlAction.Noop()
             }
 
             val links = harvestLinks(doc, krawlUrl, history, depth)
             scheduledQueue.push(krawlUrl.domain, links)
 
-            // Finally call visit
             if (visit)
-                visit(krawlUrl, doc)
-
-            if (check)
-                check(krawlUrl, doc.statusCode)
-
-            if ((finishedCount.incrementAndGet() == config.totalPages) && (config.totalPages > -1)) {
-                logger.debug("cancelling jobs")
-                if (!wasShutdown.getAndSet(true))
-                    try {
-                        job.cancel()
-                    } catch (e: CancellationException) {
-                        // Do nothing
-                    }
-                return
-            }
+                return@async KrawlAction.Visit(krawlUrl, doc)
+            else
+                return@async KrawlAction.Check(krawlUrl, doc.statusCode)
         }
 
-        schedule()
+        return@async KrawlAction.Noop()
+    }
+
+    // Set of redirect codes
+    private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
+    internal suspend fun doCrawl(channel: ReceiveChannel<KrawlAction>) {
+        channel.consumeEach { action ->
+            when(action) {
+                is KrawlAction.Visit -> launch(CommonPool + job) { visit(action.krawlUrl, action.doc) }
+                is KrawlAction.Check -> launch(CommonPool + job) { check(action.krawlUrl, action.statusCode) }
+            }
+        }
     }
 
     /**

@@ -22,18 +22,16 @@ import com.google.common.cache.CacheBuilder
 import com.google.common.cache.CacheLoader
 import com.google.common.cache.LoadingCache
 import io.thelandscape.krawler.crawler.KrawlConfig
-import kotlinx.coroutines.experimental.delay
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 
 class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config: KrawlConfig) {
 
     val logger: Logger = LogManager.getLogger()
 
-    private var popSelector: AtomicInteger = AtomicInteger(0)
-    private val pushSelector: AtomicInteger = AtomicInteger(0)
+    private var popSelector: Int = 0
+    private var pushSelector: Int = 0
 
     private val pushAffinityCache: LoadingCache<String, Int> = CacheBuilder.newBuilder()
             .maximumSize(1000)
@@ -41,7 +39,7 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
             .build(
                     object : CacheLoader<String, Int>() {
                         override fun load(key: String): Int {
-                            return pushSelector.incrementAndGet() % queues.size
+                            return pushSelector % queues.size
                         }
                     }
             )
@@ -55,7 +53,7 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
      *
      * @return [List]: List of KrawlQueueEntries that were pushed
      */
-    suspend fun push(referringDomain: String, entries: List<KrawlQueueEntry>): List<KrawlQueueEntry> {
+    fun push(referringDomain: String, entries: List<KrawlQueueEntry>): List<KrawlQueueEntry> {
         val affinity = pushAffinityCache[referringDomain]
         return queues[affinity].push(entries)
     }
@@ -66,25 +64,25 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
      *
      * @return [KrawlQueueEntry?]: A single KrawlQueueEntry if available, null otherwise
      */
-    suspend fun pop(): KrawlQueueEntry? {
+    fun pop(): KrawlQueueEntry? {
         var emptyQueueWaitCount: Long = 0
 
         // This should only be 0 in the case of testing, so this is kind of a hack
-        val modVal = if (pushSelector.get() > queues.size || pushSelector.get() == 0)
+        val modVal = if (pushSelector > queues.size || pushSelector == 0)
             queues.size
         else
-            pushSelector.get()
+            pushSelector
 
-        var entry: KrawlQueueEntry? = queues[popSelector.incrementAndGet() % modVal].pop()
+        var entry: KrawlQueueEntry? = queues[popSelector % modVal].pop()
 
         // Multiply by queue size, we'll check all of the queues each second
         while (entry == null && emptyQueueWaitCount < (config.emptyQueueWaitTime * modVal)) {
             logger.debug("Waiting on an entry... Wait count: ${emptyQueueWaitCount / modVal}")
             // Wait for the configured period for more URLs
-            delay(Math.ceil(1000.0 / modVal).toLong())
+            Thread.sleep(Math.ceil(1000.0 / modVal).toLong())
             emptyQueueWaitCount++
 
-            entry = queues[popSelector.incrementAndGet() % modVal].pop()
+            entry = queues[popSelector % modVal].pop()
         }
 
         return entry

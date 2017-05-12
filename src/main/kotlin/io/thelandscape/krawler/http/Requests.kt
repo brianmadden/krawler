@@ -20,7 +20,9 @@ package io.thelandscape.krawler.http
 
 import io.thelandscape.krawler.crawler.KrawlConfig
 import io.thelandscape.krawler.robots.RobotsTxt
-import kotlinx.coroutines.experimental.*
+import kotlinx.coroutines.experimental.CommonPool
+import kotlinx.coroutines.experimental.Deferred
+import kotlinx.coroutines.experimental.async
 import kotlinx.coroutines.experimental.sync.Mutex
 import org.apache.http.HttpRequest
 import org.apache.http.HttpResponse
@@ -40,9 +42,6 @@ import org.apache.http.protocol.HttpContext
 import org.apache.http.ssl.SSLContextBuilder
 import java.security.cert.X509Certificate
 import java.time.Instant
-import java.util.concurrent.locks.ReentrantReadWriteLock
-import kotlin.concurrent.read
-import kotlin.concurrent.write
 
 interface RequestProviderIf {
     /**
