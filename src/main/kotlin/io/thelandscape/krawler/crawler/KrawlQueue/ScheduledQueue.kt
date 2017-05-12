@@ -22,15 +22,20 @@ import com.google.common.cache.CacheBuilder
 import com.google.common.cache.CacheLoader
 import com.google.common.cache.LoadingCache
 import io.thelandscape.krawler.crawler.KrawlConfig
+import kotlinx.coroutines.experimental.*
+import kotlinx.coroutines.experimental.channels.Channel
+import kotlinx.coroutines.experimental.channels.ProducerJob
+import kotlinx.coroutines.experimental.channels.produce
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import java.util.concurrent.TimeUnit
 
-class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config: KrawlConfig) {
+class ScheduledQueue(private val queues: List<KrawlQueueIf>,
+                     private val config: KrawlConfig,
+                     private val jobContext: Job) {
 
     val logger: Logger = LogManager.getLogger()
 
-    private var popSelector: Int = 0
     private var pushSelector: Int = 0
 
     private val pushAffinityCache: LoadingCache<String, Int> = CacheBuilder.newBuilder()
@@ -39,7 +44,7 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
             .build(
                     object : CacheLoader<String, Int>() {
                         override fun load(key: String): Int {
-                            return pushSelector % queues.size
+                            return pushSelector++ % queues.size
                         }
                     }
             )
@@ -64,27 +69,38 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>, private val config:
      *
      * @return [KrawlQueueEntry?]: A single KrawlQueueEntry if available, null otherwise
      */
-    fun pop(): KrawlQueueEntry? {
-        var emptyQueueWaitCount: Long = 0
+    suspend fun pop(index: Int, channel: Channel<KrawlQueueEntry>) {
 
-        // This should only be 0 in the case of testing, so this is kind of a hack
-        val modVal = if (pushSelector > queues.size || pushSelector == 0)
-            queues.size
-        else
-            pushSelector
+        while(true) {
+            logger.debug("Popping w/ queue selector: $index")
+            var emptyQueueWaitCount: Long = 0
 
-        var entry: KrawlQueueEntry? = queues[popSelector % modVal].pop()
+            var entry: KrawlQueueEntry? = queues[index].pop()
+            while (entry == null && emptyQueueWaitCount < (config.emptyQueueWaitTime * index)) {
+                // Wait for the configured period for more URLs
+                delay(1000)
+                emptyQueueWaitCount++
 
-        // Multiply by queue size, we'll check all of the queues each second
-        while (entry == null && emptyQueueWaitCount < (config.emptyQueueWaitTime * modVal)) {
-            logger.debug("Waiting on an entry... Wait count: ${emptyQueueWaitCount / modVal}")
-            // Wait for the configured period for more URLs
-            Thread.sleep(Math.ceil(1000.0 / modVal).toLong())
-            emptyQueueWaitCount++
+                entry = queues[index].pop()
+            }
 
-            entry = queues[popSelector % modVal].pop()
+            if (entry == null) {
+                channel.close()
+                return
+            }
+
+            channel.send(entry)
+        }
+    }
+
+    fun produceKrawlQueueEntries(): Channel<KrawlQueueEntry> {
+
+        val channel: Channel<KrawlQueueEntry> = Channel()
+
+        repeat(queues.size) {
+            launch(CommonPool + jobContext) { pop(it, channel) }
         }
 
-        return entry
+        return channel
     }
 }

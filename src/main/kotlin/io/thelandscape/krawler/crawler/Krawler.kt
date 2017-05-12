@@ -81,7 +81,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
     }
 
-    internal val scheduledQueue: ScheduledQueue = ScheduledQueue(krawlQueues!!, config)
+    internal val scheduledQueue: ScheduledQueue = ScheduledQueue(krawlQueues!!, config, job)
 
     /**
      * Handle robots.txt
@@ -201,7 +201,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
 
         onCrawlStart()
-        val urls: ProducerJob<KrawlQueueEntry> = produceUrls()
+        val urls: Channel<KrawlQueueEntry> = scheduledQueue.produceKrawlQueueEntries()
         val actions: ProducerJob<KrawlAction> = produceKrawlActions(urls)
         doCrawl(actions)
         job.join()
@@ -232,7 +232,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
 
         onCrawlStart()
-        val urls: ProducerJob<KrawlQueueEntry> = produceUrls()
+        val urls: Channel<KrawlQueueEntry> = scheduledQueue.produceKrawlQueueEntries()
         val actions: ProducerJob<KrawlAction> = produceKrawlActions(urls)
         doCrawl(actions)
         onCrawlEnd()
@@ -267,21 +267,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
     internal val visitCount: AtomicInteger = AtomicInteger(0)
     internal val finishedCount: AtomicInteger = AtomicInteger(0)
-
-    suspend fun produceUrls(): ProducerJob<KrawlQueueEntry> = produce(CommonPool + job) {
-        while(true) {
-            val entry: KrawlQueueEntry? = scheduledQueue.pop()
-
-            if (entry == null) {
-                channel.close()
-                logger.debug("Closing produceUrls")
-                break
-            }
-
-            logger.debug("Sending ${entry.url}")
-            send(entry)
-        }
-    }
 
     suspend fun produceKrawlActions(entries: ReceiveChannel<KrawlQueueEntry>): ProducerJob<KrawlAction>
             = produce(CommonPool + job) {
