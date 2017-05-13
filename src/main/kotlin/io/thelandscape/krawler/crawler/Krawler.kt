@@ -192,7 +192,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @param: seedUrl List<String>: A list of seed URLs
      *
      */
-    fun start(seedUrl: List<String>) = runBlocking(CommonPool) {
+    fun start(seedUrl: List<String>, blocking: Boolean = true) = runBlocking(CommonPool) {
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
@@ -201,10 +201,16 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
 
         onCrawlStart()
-        val urls: Channel<KrawlQueueEntry> = scheduledQueue.produceKrawlQueueEntries()
-        val actions: ProducerJob<KrawlAction> = produceKrawlActions(urls)
-        doCrawl(actions)
-        job.join()
+        val urls: Channel<KrawlQueueEntry> = scheduledQueue.krawlQueueEntryChannel
+		repeat(krawlQueues!!.size) {
+		    launch(CommonPool + job) {
+    		    val actions: ProducerJob<KrawlAction> = produceKrawlActions(urls)
+	    		doCrawl(actions)
+			}
+		}
+
+        if (blocking)
+            job.join()
     }
 
     /**
@@ -224,18 +230,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @param: seedUrl List<String>: A list of seed URLs
      */
     fun startNonblocking(seedUrl: List<String>) = runBlocking(CommonPool) {
-        // Convert all URLs to KrawlUrls
-        val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
-
-        krawlUrls.forEach {
-            scheduledQueue.push(it.domain, listOf(KrawlQueueEntry(it.canonicalForm)))
-        }
-
-        onCrawlStart()
-        val urls: Channel<KrawlQueueEntry> = scheduledQueue.produceKrawlQueueEntries()
-        val actions: ProducerJob<KrawlAction> = produceKrawlActions(urls)
-        doCrawl(actions)
-        onCrawlEnd()
+        start(seedUrl, false)
     }
 
 
@@ -264,32 +259,41 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         class Noop: KrawlAction()
     }
 
-
     internal val visitCount: AtomicInteger = AtomicInteger(0)
     internal val finishedCount: AtomicInteger = AtomicInteger(0)
 
     suspend fun produceKrawlActions(entries: ReceiveChannel<KrawlQueueEntry>): ProducerJob<KrawlAction>
             = produce(CommonPool + job) {
-
-        var visited: Int = 0
-
-        entries.consumeEach { (url, parent, depth) ->
-            if (visited == config.totalPages && config.totalPages > 0) {
-                logger.debug("Closing produceKrawlActions")
-                channel.close()
-                stop()
-            }
+			
+		while(true) {
+			// This is where we'll die bomb out if we don't receive an entry after some time
+			var timeoutCounter: Long = 0
+    	    while(entries.isEmpty) {
+			    if (timeoutCounter++ == config.emptyQueueWaitTime) {
+				    logger.debug("Closing channel after timeout reached")
+				    channel.close()
+				}
+				delay(1000)
+			}
+			
+		    val (url, parent, depth) = entries.receive()
 
             val krawlUrl: KrawlUrl = KrawlUrl.new(url)
             val parentKrawlUrl: KrawlUrl = KrawlUrl.new(parent.url)
 
             val action: KrawlAction  = fetch(krawlUrl, depth, parentKrawlUrl).await()
 
-            if (action !is KrawlAction.Noop)
-                visited++
-
+            if (action !is KrawlAction.Noop) {
+			    if (visitCount.getAndIncrement() == config.totalPages && config.totalPages > 0) {
+                    logger.debug("Closing produceKrawlActions")
+                    channel.close()
+					job.cancel()
+					return@produce
+                }
+			}
+			
             send(action)
-        }
+		}
     }
 
     fun fetch(krawlUrl: KrawlUrl, depth: Int, parent: KrawlUrl): Deferred<KrawlAction> = async(CommonPool + job) {

@@ -42,6 +42,8 @@ import org.apache.http.protocol.HttpContext
 import org.apache.http.ssl.SSLContextBuilder
 import java.security.cert.X509Certificate
 import java.time.Instant
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
 
 interface RequestProviderIf {
     /**
@@ -81,6 +83,8 @@ private val pcm: PoolingHttpClientConnectionManager = PoolingHttpClientConnectio
 
 class Requests(private val krawlConfig: KrawlConfig,
                private var httpClient: CloseableHttpClient? = null) : RequestProviderIf {
+
+	private val logger: Logger = LogManager.getLogger()
 
     init {
         if (httpClient == null) {
@@ -167,9 +171,11 @@ class Requests(private val krawlConfig: KrawlConfig,
             myLock.lock()
             try {
                 val reqDelta = Instant.now().toEpochMilli() - requestTracker.getTimestamp(host)
-                if (reqDelta >= 0 && reqDelta < krawlConfig.politenessDelay)
-                // Sleep until the remainder of the politeness delay has elapsed
+                if (reqDelta >= 0 && reqDelta < krawlConfig.politenessDelay) {
+				    // Sleep until the remainder of the politeness delay has elapsed
+					logger.debug("Sleeping for ${krawlConfig.politenessDelay - reqDelta} ms for politeness.")					
                     Thread.sleep(krawlConfig.politenessDelay - reqDelta)
+				}
                 // Set last request time for politeness
                 requestTracker.setTimestamp(host, Instant.now().toEpochMilli())
             } finally {

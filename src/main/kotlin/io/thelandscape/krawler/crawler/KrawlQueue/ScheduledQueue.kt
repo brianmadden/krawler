@@ -34,8 +34,18 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>,
                      private val config: KrawlConfig,
                      private val jobContext: Job) {
 
-    val logger: Logger = LogManager.getLogger()
+    private val logger: Logger = LogManager.getLogger()
 
+	val krawlQueueEntryChannel: Channel<KrawlQueueEntry> = Channel<KrawlQueueEntry>()
+
+	init {
+	    repeat(queues.size) {
+            launch(CommonPool + jobContext) {
+			    pop(it)
+			}
+        }	
+	}
+	
     private var pushSelector: Int = 0
 
     private val pushAffinityCache: LoadingCache<String, Int> = CacheBuilder.newBuilder()
@@ -64,43 +74,25 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>,
     }
 
     /**
-     * Pops a KrawlQueueEntry from the first queue with an entry available. This method
-     * will rotate through the queues in round robin fashion to try to increase parallelism.
+     * Pops a KrawlQueueEntry from a KrawlQueue.
      *
-     * @return [KrawlQueueEntry?]: A single KrawlQueueEntry if available, null otherwise
+     * @return [KrawlQueueEntry]: A single KrawlQueueEntry
      */
-    suspend fun pop(index: Int, channel: Channel<KrawlQueueEntry>) {
+    suspend fun pop(index: Int) {
+		var emptyQueueWaitCount: Int = 0
 
-        while(true) {
+		while(true) {
             logger.debug("Popping w/ queue selector: $index")
-            var emptyQueueWaitCount: Long = 0
 
-            var entry: KrawlQueueEntry? = queues[index].pop()
-            while (entry == null && emptyQueueWaitCount < (config.emptyQueueWaitTime * index)) {
-                // Wait for the configured period for more URLs
+			var entry: KrawlQueueEntry? = queues[index].pop()
+			
+			while (entry == null) {
+				logger.debug("Delaying queue:$index for 1000...")
                 delay(1000)
-                emptyQueueWaitCount++
-
                 entry = queues[index].pop()
             }
-
-            if (entry == null) {
-                channel.close()
-                return
-            }
-
-            channel.send(entry)
+            
+            krawlQueueEntryChannel.send(entry)
         }
-    }
-
-    fun produceKrawlQueueEntries(): Channel<KrawlQueueEntry> {
-
-        val channel: Channel<KrawlQueueEntry> = Channel()
-
-        repeat(queues.size) {
-            launch(CommonPool + jobContext) { pop(it, channel) }
-        }
-
-        return channel
     }
 }
