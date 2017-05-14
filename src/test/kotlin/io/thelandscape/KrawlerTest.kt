@@ -18,7 +18,8 @@ package io.thelandscape
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import com.nhaarman.mockito_kotlin.*
+import com.nhaarman.mockito_kotlin.MockitoKotlin
+import com.nhaarman.mockito_kotlin.mock
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
 import io.thelandscape.krawler.crawler.KrawlConfig
@@ -88,31 +89,8 @@ class KrawlerTest {
      * Test the doCrawl method
      */
 
-    @Test fun testDoCrawl() {
-        // Make the hasBeenSeen return true
-        whenever(mockHistory.hasBeenSeen(any())).thenReturn(false)
-        whenever(mockHistory.insert(any())).thenReturn(KrawlHistoryEntry())
-        // Make sure we get a request response
-        whenever(mockRequests.getUrl(any())).thenReturn(preparedResponse)
-        // Make robo minder return true
-        whenever(mockMinder.isSafeToVisit(any())).thenReturn(true)
-        //
-        whenever(mockQueue[0].pop()).thenReturn(KrawlQueueEntry("http://www.test.com"))
+    @Test fun testDoCrawl() = runBlocking {
 
-        // Get it started
-        runBlocking { testKrawler.doCrawl() }
-
-        verify(mockQueue[0], times(1)).pop()
-        // Verify that isSafeToVisit was called, minding robots.txt
-        verify(mockMinder, times(1)).isSafeToVisit(KrawlUrl.new("http://www.test.com"))
-        // Ensure we've called to verify this is a unique URL
-        verify(mockHistory, times(1)).hasBeenSeen(any())
-        // Now verify that we insert the URL to the history
-        verify(mockHistory, times(1)).insert(any())
-
-        // The global visit count should also be 1
-        assertEquals(1, testKrawler.visitCount.get())
-        assertEquals(1, testKrawler.finishedCount.get())
     }
 
     @Test fun testHarvestLinks() {

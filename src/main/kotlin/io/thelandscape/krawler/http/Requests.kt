@@ -50,17 +50,17 @@ interface RequestProviderIf {
     /**
      * Method to check the status code of a URL
      */
-    fun checkUrl(url: KrawlUrl): Deferred<RequestResponse>
+    suspend fun checkUrl(url: KrawlUrl): RequestResponse
 
     /**
      * Method to get the contents of a URL
      */
-    fun getUrl(url: KrawlUrl): Deferred<RequestResponse>
+    suspend fun getUrl(url: KrawlUrl): RequestResponse
 
     /**
      * Method to get a robots.txt from a KrawlUrl
      */
-    fun fetchRobotsTxt(url: KrawlUrl): Deferred<RequestResponse>
+    suspend fun fetchRobotsTxt(url: KrawlUrl): RequestResponse
 }
 
 internal class HistoryTrackingRedirectStrategy: DefaultRedirectStrategy() {
@@ -123,9 +123,13 @@ class Requests(private val krawlConfig: KrawlConfig,
      *
      * @return [Deferred<RequestResponse>]: The parsed robots.txt or, or ErrorResponse on error
      */
-    override fun fetchRobotsTxt(url: KrawlUrl): Deferred<RequestResponse> {
+    override suspend fun fetchRobotsTxt(url: KrawlUrl): RequestResponse {
+        return asyncFetchRobotsTxt(url).await()
+    }
+
+    internal fun asyncFetchRobotsTxt(url: KrawlUrl): Deferred<RequestResponse> {
         val robotsRequest = KrawlUrl.new("${url.hierarchicalPart}/robots.txt")
-        return makeRequest(robotsRequest, ::HttpGet, ::RobotsTxt)
+        return asyncMakeRequest(robotsRequest, ::HttpGet, ::RobotsTxt)
     }
 
     /** Check a URL and return it's status code
@@ -133,8 +137,8 @@ class Requests(private val krawlConfig: KrawlConfig,
      *
      * @return [Deferred<RequestResponse>]: KrawlDocument containing the status code, or ErrorResponse on error
      */
-   override fun checkUrl(url: KrawlUrl): Deferred<RequestResponse> {
-        return makeRequest(url, ::HttpHead, ::KrawlDocument)
+   override suspend fun checkUrl(url: KrawlUrl): RequestResponse {
+        return asyncMakeRequest(url, ::HttpHead, ::KrawlDocument).await()
     }
 
     /** Get the contents of a URL
@@ -142,8 +146,8 @@ class Requests(private val krawlConfig: KrawlConfig,
      *
      * @return [RequestResponse]: The parsed HttpResponse returned by the GET request
      */
-    override fun getUrl(url: KrawlUrl): Deferred<RequestResponse> {
-        return makeRequest(url, ::HttpGet, ::KrawlDocument)
+    override suspend fun getUrl(url: KrawlUrl): RequestResponse {
+        return asyncMakeRequest(url, ::HttpGet, ::KrawlDocument).await()
     }
 
     // Hash map to track requests and respect politeness
@@ -154,9 +158,9 @@ class Requests(private val krawlConfig: KrawlConfig,
      * @param reqFun: Function used to construct the request
      * @param retFun: Function used to construct the response object
      */
-    private fun makeRequest(url: KrawlUrl,
-                            reqFun: (String) -> HttpUriRequest,
-                            retFun: (KrawlUrl, HttpResponse, HttpClientContext) -> RequestResponse)
+    private fun asyncMakeRequest(url: KrawlUrl,
+                                 reqFun: (String) -> HttpUriRequest,
+                                 retFun: (KrawlUrl, HttpResponse, HttpClientContext) -> RequestResponse)
             : Deferred<RequestResponse> = async(CommonPool) {
 
         val httpContext = HttpClientContext()

@@ -23,7 +23,6 @@ import com.google.common.cache.CacheBuilder
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestProviderIf
 import io.thelandscape.krawler.http.RequestResponse
-import kotlinx.coroutines.experimental.Deferred
 
 interface RoboMinderIf {
     suspend fun isSafeToVisit(url: KrawlUrl): Boolean
@@ -43,7 +42,7 @@ class RoboMinder(private val userAgent: String,
             .build()
 
 
-    internal fun fetch(host: String): Deferred<RequestResponse> {
+    internal suspend fun fetch(host: String): RequestResponse {
         val robotsUrl = KrawlUrl.new("$host/robots.txt")
         return request.fetchRobotsTxt(robotsUrl)
     }
@@ -87,7 +86,7 @@ class RoboMinder(private val userAgent: String,
         // Not bothering to lock this since it should be idempotent
         val withoutGetParams: String = url.path.split("?").firstOrNull() ?: url.path
         if (url.hierarchicalPart !in rules.asMap()) {
-            val resp = fetch(url.hierarchicalPart).await()
+            val resp = fetch(url.hierarchicalPart)
             rules.put(url.hierarchicalPart, process(resp))
         }
 

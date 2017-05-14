@@ -54,7 +54,7 @@ project(":") {
 
         compile group: 'com.google.guava', name: 'guava', version: '19.0'
 
-        testCompile "com.nhaarman:mockito-kotlin:0.9.0"
+        testCompile "com.nhaarman:mockito-kotlin:1.4.0"
         testCompile "org.jetbrains.kotlin:kotlin-test:$kotlin_version"
         testCompile "junit:junit:4.12"
     }

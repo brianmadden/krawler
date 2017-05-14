@@ -32,8 +32,6 @@ import org.apache.http.client.protocol.HttpClientContext
 import org.apache.http.impl.client.CloseableHttpClient
 import org.junit.Test
 import java.time.Instant
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
@@ -47,15 +45,15 @@ class RequestsTest {
     val testUrl2 = KrawlUrl.new("http://nothttpbin.org/1/")
 
     @Test fun testRequestCheck() {
-        request.checkUrl(testUrl)
-        // it should call execute once with an HttpHead
-        // TODO: Swap the any() call to HttpHead somehow
+        runBlocking<Unit> {
+            request.checkUrl(testUrl)
+            // it should call execute once with an HttpHead
+            // TODO: Swap the any() call to HttpHead somehow
+        }
         verify(mockHttpClient, times(1)).execute(any<HttpUriRequest>(), any<HttpClientContext>())
     }
 
-    @Test fun testRequestGet() {
-
-        val threadpool: ExecutorService = Executors.newFixedThreadPool(4)
+    @Test fun testRequestGet() = runBlocking<Unit> {
         val numTimes = 10
         val start = Instant.now().toEpochMilli()
         (1 .. numTimes).forEach {
@@ -63,8 +61,6 @@ class RequestsTest {
             // Issue two requests
             request.getUrl(testUrl2)
         }
-        threadpool.shutdown()
-        while(!threadpool.isTerminated) {}
         val end = Instant.now().toEpochMilli()
 
         // Make sure that the politeness delay is respected

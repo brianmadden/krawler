@@ -331,9 +331,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             }
 
             val doc: RequestResponse = if (visit) {
-                requestProvider.getUrl(krawlUrl).await()
+                requestProvider.getUrl(krawlUrl)
             } else {
-                requestProvider.checkUrl(krawlUrl).await()
+                requestProvider.checkUrl(krawlUrl)
             }
 
             // If there was an error on trying to get the doc, call content fetch error
