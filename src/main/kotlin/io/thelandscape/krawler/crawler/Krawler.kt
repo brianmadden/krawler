@@ -73,6 +73,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 }
 
         }
+
+        job.invokeOnCompletion {
+            logger.debug("Ending here... (job is no longer active)!!!!")
+            onCrawlEnd()
+        }
     }
 
     internal val scheduledQueue: ScheduledQueue = ScheduledQueue(krawlQueues!!, config, job)
@@ -187,13 +192,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      *
      */
     fun start(seedUrl: List<String>, blocking: Boolean = true) = runBlocking(CommonPool) {
-        if (!blocking) {
-            job.invokeOnCompletion {
-                logger.debug("Ending here... (job is no longer active)!!!!")
-                onCrawlEnd()
-            }
-        }
-
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
@@ -210,10 +208,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 			}
 		}
 
-        if (blocking) {
+        if (blocking)
             job.join()
-            onCrawlEnd()
-        }
     }
 
     /**
@@ -232,7 +228,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      *
      * @param: seedUrl List<String>: A list of seed URLs
      */
-    fun startNonblocking(seedUrl: List<String>) = runBlocking(CommonPool) {
+    fun startNonblocking(seedUrl: List<String>) {
         start(seedUrl, false)
     }
 
@@ -367,8 +363,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     internal suspend fun doCrawl(channel: ReceiveChannel<KrawlAction>) {
         channel.consumeEach { action ->
             when(action) {
-                is KrawlAction.Visit -> launch(CommonPool + job) { visit(action.krawlUrl, action.doc) }
-                is KrawlAction.Check -> launch(CommonPool + job) { check(action.krawlUrl, action.statusCode) }
+                is KrawlAction.Visit -> visit(action.krawlUrl, action.doc)
+                is KrawlAction.Check -> check(action.krawlUrl, action.statusCode)
             }
         }
     }
