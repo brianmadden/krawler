@@ -23,6 +23,7 @@ import io.thelandscape.krawler.robots.RobotsTxt
 import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.Deferred
 import kotlinx.coroutines.experimental.async
+import kotlinx.coroutines.experimental.delay
 import kotlinx.coroutines.experimental.sync.Mutex
 import org.apache.http.HttpRequest
 import org.apache.http.HttpResponse
@@ -40,10 +41,10 @@ import org.apache.http.impl.client.HttpClients
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import org.apache.http.protocol.HttpContext
 import org.apache.http.ssl.SSLContextBuilder
-import java.security.cert.X509Certificate
-import java.time.Instant
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
+import java.security.cert.X509Certificate
+import java.time.Instant
 
 interface RequestProviderIf {
     /**
@@ -98,7 +99,7 @@ class Requests(private val krawlConfig: KrawlConfig,
                     .setSocketTimeout(krawlConfig.socketTimeout)
                     .build()
 
-            val trustStrat = TrustStrategy { arrayOfX509Certificates: Array<X509Certificate>, s: String -> true }
+            val trustStrat = TrustStrategy { _: Array<X509Certificate>, _: String -> true }
 
             val sslContext = SSLContextBuilder.create()
                     .loadTrustMaterial(null, trustStrat)
@@ -174,7 +175,7 @@ class Requests(private val krawlConfig: KrawlConfig,
                 if (reqDelta >= 0 && reqDelta < krawlConfig.politenessDelay) {
 				    // Sleep until the remainder of the politeness delay has elapsed
 					logger.debug("Sleeping for ${krawlConfig.politenessDelay - reqDelta} ms for politeness.")					
-                    Thread.sleep(krawlConfig.politenessDelay - reqDelta)
+                    delay(krawlConfig.politenessDelay - reqDelta)
 				}
                 // Set last request time for politeness
                 requestTracker.setTimestamp(host, Instant.now().toEpochMilli())

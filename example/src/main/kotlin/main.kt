@@ -20,7 +20,7 @@ import io.thelandscape.krawler.crawler.KrawlConfig
 
 fun main(args: Array<String>) {
 
-    val config: KrawlConfig = KrawlConfig(totalPages = 1000)
+    val config: KrawlConfig = KrawlConfig(totalPages = 100)
     val k = SimpleExample(config)
 
     // Add a few different hosts to the whitelist

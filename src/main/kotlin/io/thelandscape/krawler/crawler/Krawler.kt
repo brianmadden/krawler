@@ -73,12 +73,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 }
 
         }
-
-        job.invokeOnCompletion {
-            logger.debug("Ending here... (job is no longer active)!!!!")
-            onCrawlEnd()
-        }
-
     }
 
     internal val scheduledQueue: ScheduledQueue = ScheduledQueue(krawlQueues!!, config, job)
@@ -142,7 +136,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * This can be overridden to take action on content fetch errors.
      *
      * @param url KrawlUrl: The URL that failed
-     * @param error ContentFetchError: The content fetch error that was thrown.
+     * @param reason String: An error message or reason for the error.
      */
     open protected fun onContentFetchError(url: KrawlUrl, reason: String) {
         return
@@ -193,6 +187,13 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      *
      */
     fun start(seedUrl: List<String>, blocking: Boolean = true) = runBlocking(CommonPool) {
+        if (!blocking) {
+            job.invokeOnCompletion {
+                logger.debug("Ending here... (job is no longer active)!!!!")
+                onCrawlEnd()
+            }
+        }
+
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
@@ -209,8 +210,10 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 			}
 		}
 
-        if (blocking)
+        if (blocking) {
             job.join()
+            onCrawlEnd()
+        }
     }
 
     /**
@@ -262,9 +265,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     internal val visitCount: AtomicInteger = AtomicInteger(0)
     internal val finishedCount: AtomicInteger = AtomicInteger(0)
 
-    suspend fun produceKrawlActions(entries: ReceiveChannel<KrawlQueueEntry>): ProducerJob<KrawlAction>
+    private suspend fun produceKrawlActions(entries: ReceiveChannel<KrawlQueueEntry>): ProducerJob<KrawlAction>
             = produce(CommonPool + job) {
-			
+
 		while(true) {
 			// This is where we'll die bomb out if we don't receive an entry after some time
 			var timeoutCounter: Long = 0
@@ -272,6 +275,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 			    if (timeoutCounter++ == config.emptyQueueWaitTime) {
 				    logger.debug("Closing channel after timeout reached")
 				    channel.close()
+                    job.cancel()
+                    return@produce
 				}
 				delay(1000)
 			}
@@ -284,9 +289,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             val action: KrawlAction  = fetch(krawlUrl, depth, parentKrawlUrl).await()
 
             if (action !is KrawlAction.Noop) {
-			    if (visitCount.getAndIncrement() == config.totalPages && config.totalPages > 0) {
+			    if (visitCount.getAndIncrement() >= config.totalPages && config.totalPages > 0) {
                     logger.debug("Closing produceKrawlActions")
-                    channel.close()
 					job.cancel()
 					return@produce
                 }
@@ -296,7 +300,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 		}
     }
 
-    fun fetch(krawlUrl: KrawlUrl, depth: Int, parent: KrawlUrl): Deferred<KrawlAction> = async(CommonPool + job) {
+    private fun fetch(krawlUrl: KrawlUrl, depth: Int, parent: KrawlUrl): Deferred<KrawlAction>
+            = async(CommonPool + job) {
 
         // Make sure we're within depth limit
         if (depth >= config.maxDepth && config.maxDepth != -1) {
