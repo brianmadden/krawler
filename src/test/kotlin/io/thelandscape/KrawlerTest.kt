@@ -31,7 +31,9 @@ import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestProviderIf
 import io.thelandscape.krawler.robots.RoboMinderIf
 import io.thelandscape.krawler.robots.RobotsConfig
+import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.Job
+import kotlinx.coroutines.experimental.channels.produce
 import kotlinx.coroutines.experimental.runBlocking
 import org.apache.http.client.protocol.HttpClientContext
 import org.junit.Before
@@ -42,7 +44,7 @@ import kotlin.test.assertTrue
 class KrawlerTest {
 
     val exampleUrl = KrawlUrl.new("http://www.example.org")
-    val mockConfig = KrawlConfig(emptyQueueWaitTime = 1, totalPages = 1)
+    val mockConfig = KrawlConfig(emptyQueueWaitTime = 1, totalPages = 1, maxDepth = 4)
     val mockHistory = mock<KrawlHistoryIf>()
     val mockQueue = listOf(mock<KrawlQueueIf>())
     val mockRequests = mock<RequestProviderIf>()
@@ -62,6 +64,9 @@ class KrawlerTest {
                       u: RobotsConfig?,
                       v: RequestProviderIf,
                       z: Job): Krawler(x, w, y, u, v, z) {
+
+        val capture: MutableList<String> = mutableListOf()
+
         override fun shouldVisit(url: KrawlUrl): Boolean {
             return true
         }
@@ -71,9 +76,11 @@ class KrawlerTest {
         }
 
         override fun visit(url: KrawlUrl, doc: KrawlDocument) {
+            capture.add("VISIT - ${url.rawUrl}")
         }
 
         override fun check(url: KrawlUrl, statusCode: Int) {
+            capture.add("CHECK - ${url.rawUrl}")
         }
 
     }
@@ -83,6 +90,7 @@ class KrawlerTest {
     @Before fun setUp() {
         MockitoKotlin.registerInstanceCreator { KrawlUrl.new("") }
         testKrawler.minder = mockMinder
+        testKrawler.capture.clear()
     }
 
     /**
@@ -90,8 +98,34 @@ class KrawlerTest {
      */
 
     @Test fun testDoCrawl() = runBlocking {
+        val allThree = produce(CommonPool) {
+            for (a in listOf(Krawler.KrawlAction.Noop(),
+                    Krawler.KrawlAction.Visit(exampleUrl, preparedResponse),
+                    Krawler.KrawlAction.Check(exampleUrl, preparedResponse.statusCode)))
+                send(a)
+        }
 
+        testKrawler.doCrawl(allThree)
+        assertTrue(testKrawler.capture.contains("VISIT - http://www.example.org"))
+        assertTrue(testKrawler.capture.contains("CHECK - http://www.example.org"))
+        assertEquals(2, testKrawler.capture.size)
     }
+
+    /**
+     * TODO: Add this test when there is better support for coroutines in mockito
+    @Test fun testFetch() = runBlocking {
+
+        whenever(mockMinder.isSafeToVisit(any())).thenReturn(true)
+
+        // Depth tests (max depth was set to 4)
+        var resp = testKrawler.fetch(exampleUrl, 5, exampleUrl).await()
+        assertTrue { resp is Krawler.KrawlAction.Noop }
+
+        resp = testKrawler.fetch(exampleUrl, 3, exampleUrl).await()
+
+        assertTrue { resp is Krawler.KrawlAction.Visit }
+    }
+    */
 
     @Test fun testHarvestLinks() {
         val links: List<KrawlQueueEntry> =

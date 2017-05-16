@@ -189,6 +189,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * of the crawl.
      *
      * @param: seedUrl List<String>: A list of seed URLs
+     * @param: blocking [Boolean]: (default true) whether to block until completion or immediately return
      *
      */
     fun start(seedUrl: List<String>, blocking: Boolean = true) = runBlocking(CommonPool) {
@@ -252,16 +253,15 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * Private members
      */
 
-    sealed class KrawlAction {
+    internal sealed class KrawlAction {
         data class Visit(val krawlUrl: KrawlUrl, val doc: KrawlDocument): KrawlAction()
         data class Check(val krawlUrl: KrawlUrl, val statusCode: Int): KrawlAction()
         class Noop: KrawlAction()
     }
 
     internal val visitCount: AtomicInteger = AtomicInteger(0)
-    internal val finishedCount: AtomicInteger = AtomicInteger(0)
 
-    private suspend fun produceKrawlActions(entries: ReceiveChannel<KrawlQueueEntry>): ProducerJob<KrawlAction>
+    internal suspend fun produceKrawlActions(entries: ReceiveChannel<KrawlQueueEntry>): ProducerJob<KrawlAction>
             = produce(CommonPool + job) {
 
 		while(true) {
@@ -296,7 +296,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 		}
     }
 
-    private fun fetch(krawlUrl: KrawlUrl, depth: Int, parent: KrawlUrl): Deferred<KrawlAction>
+    internal fun fetch(krawlUrl: KrawlUrl, depth: Int, parent: KrawlUrl): Deferred<KrawlAction>
             = async(CommonPool + job) {
 
         // Make sure we're within depth limit
@@ -315,7 +315,6 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                     krawlHistory!!.insert(krawlUrl)
                 }
 
-        // If we're supposed to visit this, get the HTML and call visit
         val visit = shouldVisit(krawlUrl)
         val check = shouldCheck(krawlUrl)
 
@@ -360,6 +359,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
     // Set of redirect codes
     private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
+
     internal suspend fun doCrawl(channel: ReceiveChannel<KrawlAction>) {
         channel.consumeEach { action ->
             when(action) {
@@ -379,7 +379,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @return a list of [KrawlQueueEntry] containing the URLs to crawl
      */
     internal suspend fun harvestLinks(doc: KrawlDocument, url: KrawlUrl,
-                              history: KrawlHistoryEntry, depth: Int): List<KrawlQueueEntry> {
+                                      history: KrawlHistoryEntry, depth: Int): List<KrawlQueueEntry> {
 
         // Handle redirects by getting the location tag of the header and pushing that into the queue
         if (!config.useFastRedirectStrategy && doc.statusCode in redirectCodes && config.followRedirects) {
