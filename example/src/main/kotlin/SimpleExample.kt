@@ -22,6 +22,7 @@ import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
 import java.time.LocalTime
 import java.util.concurrent.ConcurrentSkipListSet
+import java.util.concurrent.atomic.AtomicInteger
 
 class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
@@ -38,15 +39,14 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
         return (!FILTERS.matches(withoutGetParams) && url.host in whitelist)
     }
 
-    private var counter: Int = 0
-    private val counterLock: Any = Any()
+    private val counter: AtomicInteger = AtomicInteger(0)
 
     override fun visit(url: KrawlUrl, doc: KrawlDocument) {
-        println("${synchronized(counterLock) {++counter}}. Crawling ${url.canonicalForm}")
+        println("${counter.incrementAndGet()}. Crawling ${url.canonicalForm}")
     }
 
     override fun onContentFetchError(url: KrawlUrl, reason: String) {
-        println("${synchronized(counterLock) {++counter}}. Tried to crawl ${url.canonicalForm} but failed to read the content.")
+        println("${counter.incrementAndGet()}. Tried to crawl ${url.canonicalForm} but failed to read the content.")
     }
 
     private var startTimestamp: Long = 0
@@ -57,6 +57,6 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
     }
     override fun onCrawlEnd() {
         endTimestamp = LocalTime.now().toNanoOfDay()
-        println("Crawled $counter pages in ${(endTimestamp - startTimestamp) / 1000000000.0} seconds. $visitCount")
+        println("Crawled $counter pages in ${(endTimestamp - startTimestamp) / 1000000000.0} seconds.")
     }
 }

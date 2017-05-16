@@ -18,21 +18,20 @@ package io.thelandscape
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import com.nhaarman.mockito_kotlin.*
+import com.nhaarman.mockito_kotlin.any
+import com.nhaarman.mockito_kotlin.mock
+import com.nhaarman.mockito_kotlin.times
+import com.nhaarman.mockito_kotlin.verify
 import io.thelandscape.krawler.crawler.KrawlConfig
-import io.thelandscape.krawler.http.HistoryTrackingRedirectStrategy
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestTracker
 import io.thelandscape.krawler.http.Requests
-import org.apache.http.HttpResponse
-import org.apache.http.client.methods.CloseableHttpResponse
+import kotlinx.coroutines.experimental.runBlocking
 import org.apache.http.client.methods.HttpUriRequest
 import org.apache.http.client.protocol.HttpClientContext
 import org.apache.http.impl.client.CloseableHttpClient
 import org.junit.Test
 import java.time.Instant
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
@@ -46,15 +45,15 @@ class RequestsTest {
     val testUrl2 = KrawlUrl.new("http://nothttpbin.org/1/")
 
     @Test fun testRequestCheck() {
-        request.checkUrl(testUrl)
-        // it should call execute once with an HttpHead
-        // TODO: Swap the any() call to HttpHead somehow
+        runBlocking<Unit> {
+            request.checkUrl(testUrl)
+            // it should call execute once with an HttpHead
+            // TODO: Swap the any() call to HttpHead somehow
+        }
         verify(mockHttpClient, times(1)).execute(any<HttpUriRequest>(), any<HttpClientContext>())
     }
 
-    @Test fun testRequestGet() {
-
-        val threadpool: ExecutorService = Executors.newFixedThreadPool(4)
+    @Test fun testRequestGet() = runBlocking<Unit> {
         val numTimes = 10
         val start = Instant.now().toEpochMilli()
         (1 .. numTimes).forEach {
@@ -62,8 +61,6 @@ class RequestsTest {
             // Issue two requests
             request.getUrl(testUrl2)
         }
-        threadpool.shutdown()
-        while(!threadpool.isTerminated) {}
         val end = Instant.now().toEpochMilli()
 
         // Make sure that the politeness delay is respected
@@ -80,9 +77,9 @@ class RequestTrackerTest {
     val requestTracker: RequestTracker = RequestTracker()
 
     @Test fun testGetLock() {
-        val first = requestTracker.getLock("test")
-        val second = requestTracker.getLock("test")
-        val third = requestTracker.getLock("test2")
+        val first = runBlocking { requestTracker.getLock("test") }
+        val second = runBlocking { requestTracker.getLock("test") }
+        val third = runBlocking { requestTracker.getLock("test2") }
 
         // Test that the same parameter actually gets the same lock
         assertEquals(first, second)

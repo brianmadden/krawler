@@ -20,6 +20,11 @@ package io.thelandscape.krawler.http
 
 import io.thelandscape.krawler.crawler.KrawlConfig
 import io.thelandscape.krawler.robots.RobotsTxt
+import kotlinx.coroutines.experimental.CommonPool
+import kotlinx.coroutines.experimental.Deferred
+import kotlinx.coroutines.experimental.async
+import kotlinx.coroutines.experimental.delay
+import kotlinx.coroutines.experimental.sync.Mutex
 import org.apache.http.HttpRequest
 import org.apache.http.HttpResponse
 import org.apache.http.client.config.CookieSpecs
@@ -36,27 +41,26 @@ import org.apache.http.impl.client.HttpClients
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import org.apache.http.protocol.HttpContext
 import org.apache.http.ssl.SSLContextBuilder
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
 import java.security.cert.X509Certificate
 import java.time.Instant
-import java.util.concurrent.locks.ReentrantReadWriteLock
-import kotlin.concurrent.read
-import kotlin.concurrent.write
 
 interface RequestProviderIf {
     /**
      * Method to check the status code of a URL
      */
-    fun checkUrl(url: KrawlUrl): RequestResponse
+    suspend fun checkUrl(url: KrawlUrl): RequestResponse
 
     /**
      * Method to get the contents of a URL
      */
-    fun getUrl(url: KrawlUrl): RequestResponse
+    suspend fun getUrl(url: KrawlUrl): RequestResponse
 
     /**
      * Method to get a robots.txt from a KrawlUrl
      */
-    fun fetchRobotsTxt(url: KrawlUrl): RequestResponse
+    suspend fun fetchRobotsTxt(url: KrawlUrl): RequestResponse
 }
 
 internal class HistoryTrackingRedirectStrategy: DefaultRedirectStrategy() {
@@ -81,6 +85,8 @@ private val pcm: PoolingHttpClientConnectionManager = PoolingHttpClientConnectio
 class Requests(private val krawlConfig: KrawlConfig,
                private var httpClient: CloseableHttpClient? = null) : RequestProviderIf {
 
+	private val logger: Logger = LogManager.getLogger()
+
     init {
         if (httpClient == null) {
             val requestConfig = RequestConfig.custom()
@@ -93,7 +99,7 @@ class Requests(private val krawlConfig: KrawlConfig,
                     .setSocketTimeout(krawlConfig.socketTimeout)
                     .build()
 
-            val trustStrat = TrustStrategy { arrayOfX509Certificates: Array<X509Certificate>, s: String -> true }
+            val trustStrat = TrustStrategy { _: Array<X509Certificate>, _: String -> true }
 
             val sslContext = SSLContextBuilder.create()
                     .loadTrustMaterial(null, trustStrat)
@@ -115,26 +121,34 @@ class Requests(private val krawlConfig: KrawlConfig,
     /** Fetch the robots.txt file from a domain
      * @param url [KrawlUrl]: The URL to fetch robots from
      *
-     * @return [RequestResponse]: The parsed robots.txt or, or ErrorResponse on error
+     * @return [Deferred<RequestResponse>]: The parsed robots.txt or, or ErrorResponse on error
      */
-    override fun fetchRobotsTxt(url: KrawlUrl): RequestResponse {
+    override suspend fun fetchRobotsTxt(url: KrawlUrl): RequestResponse {
+        return asyncFetchRobotsTxt(url).await()
+    }
+
+    internal fun asyncFetchRobotsTxt(url: KrawlUrl): Deferred<RequestResponse> {
         val robotsRequest = KrawlUrl.new("${url.hierarchicalPart}/robots.txt")
-        return makeRequest(robotsRequest, ::HttpGet, ::RobotsTxt)
+        return asyncMakeRequest(robotsRequest, ::HttpGet, ::RobotsTxt)
     }
 
     /** Check a URL and return it's status code
      * @param url KrawlUrl: the url to check
      *
-     * @return [RequestResponse]: KrawlDocument containing the status code, or ErrorResponse on error
+     * @return [Deferred<RequestResponse>]: KrawlDocument containing the status code, or ErrorResponse on error
      */
-   override fun checkUrl(url: KrawlUrl): RequestResponse = makeRequest(url, ::HttpHead, ::KrawlDocument)
+   override suspend fun checkUrl(url: KrawlUrl): RequestResponse {
+        return asyncMakeRequest(url, ::HttpHead, ::KrawlDocument).await()
+    }
 
     /** Get the contents of a URL
      * @param url KrawlUrl: the URL to get the contents of
      *
      * @return [RequestResponse]: The parsed HttpResponse returned by the GET request
      */
-    override fun getUrl(url: KrawlUrl): RequestResponse = makeRequest(url, ::HttpGet, ::KrawlDocument)
+    override suspend fun getUrl(url: KrawlUrl): RequestResponse {
+        return asyncMakeRequest(url, ::HttpGet, ::KrawlDocument).await()
+    }
 
     // Hash map to track requests and respect politeness
     private val requestTracker: RequestTracker = RequestTracker()
@@ -144,9 +158,10 @@ class Requests(private val krawlConfig: KrawlConfig,
      * @param reqFun: Function used to construct the request
      * @param retFun: Function used to construct the response object
      */
-    private fun makeRequest(url: KrawlUrl,
-                            reqFun: (String) -> HttpUriRequest,
-                            retFun: (KrawlUrl, HttpResponse, HttpClientContext) -> RequestResponse): RequestResponse {
+    private fun asyncMakeRequest(url: KrawlUrl,
+                                 reqFun: (String) -> HttpUriRequest,
+                                 retFun: (KrawlUrl, HttpResponse, HttpClientContext) -> RequestResponse)
+            : Deferred<RequestResponse> = async(CommonPool) {
 
         val httpContext = HttpClientContext()
         httpContext.setAttribute("fullRedirectHistory", listOf<RedirectHistoryNode>())
@@ -157,13 +172,19 @@ class Requests(private val krawlConfig: KrawlConfig,
         // Handle politeness
 
         if (krawlConfig.politenessDelay > 0) {
-            synchronized(requestTracker.getLock(host)) {
+            val myLock = requestTracker.getLock(host)
+            myLock.lock()
+            try {
                 val reqDelta = Instant.now().toEpochMilli() - requestTracker.getTimestamp(host)
-                if (reqDelta >= 0 && reqDelta < krawlConfig.politenessDelay)
-                // Sleep until the remainder of the politeness delay has elapsed
-                    Thread.sleep(krawlConfig.politenessDelay - reqDelta)
+                if (reqDelta >= 0 && reqDelta < krawlConfig.politenessDelay) {
+				    // Sleep until the remainder of the politeness delay has elapsed
+					logger.debug("Sleeping for ${krawlConfig.politenessDelay - reqDelta} ms for politeness.")					
+                    delay(krawlConfig.politenessDelay - reqDelta)
+				}
                 // Set last request time for politeness
                 requestTracker.setTimestamp(host, Instant.now().toEpochMilli())
+            } finally {
+                myLock.unlock()
             }
         }
 
@@ -174,7 +195,7 @@ class Requests(private val krawlConfig: KrawlConfig,
             ErrorResponse(url, e.toString())
         }
 
-        return resp
+        resp
     }
 }
 
@@ -184,8 +205,8 @@ class Requests(private val krawlConfig: KrawlConfig,
  */
 class RequestTracker {
 
-    private val lockMapLock: ReentrantReadWriteLock = ReentrantReadWriteLock()
-    private val lockMap: MutableMap<String, Any> = mutableMapOf()
+    private val lockMapLock: Mutex = Mutex()
+    private val lockMap: MutableMap<String, Mutex> = mutableMapOf()
     private val timestampMap: MutableMap<String, Long> = mutableMapOf()
 
     /**
@@ -195,11 +216,15 @@ class RequestTracker {
      * Note: This operation -IS- threadsafe.
      *
      * @param host String: The host that this lock will be associated with.
-     * @return the [Any] object that will lock the synchronized section
+     * @return the [Mutex] object that will lock the synchronized section
      */
-    fun getLock(host: String): Any {
-        return lockMapLock.read { lockMap[host] } ?:
-                lockMapLock.write { lockMap.getOrPut(host, { Any() }) }
+    suspend fun getLock(host: String): Mutex {
+        lockMapLock.lock()
+        return try {
+            lockMap[host] ?: lockMap.getOrPut(host, { Mutex() })
+        } finally {
+            lockMapLock.unlock()
+        }
     }
 
     /**

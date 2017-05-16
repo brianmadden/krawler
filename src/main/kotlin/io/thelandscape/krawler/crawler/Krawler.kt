@@ -30,17 +30,21 @@ import io.thelandscape.krawler.http.*
 import io.thelandscape.krawler.robots.RoboMinder
 import io.thelandscape.krawler.robots.RoboMinderIf
 import io.thelandscape.krawler.robots.RobotsConfig
+import kotlinx.coroutines.experimental.*
+import kotlinx.coroutines.experimental.channels.*
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Class defines the operations and data structures used to perform a web crawl.
  *
  * @param config: A KrawlConfig object to control the limits and settings of the crawler
- * @param queue: A KrawlQueueIf provider, by default this will be a HSQL backed queue defined in the Dao
+ * @param krawlHistory: KrawlHistoryIf provider, by default this will be a HSQL backed table
+ * @param krawlQueues: A KrawlQueueIf provider, by default this will be a HSQL backed queue
+ * @param robotsConfig: Configuration of the robots.txt management
+ * @param requestProvider: RequestProviderIf provider, default is Requests class
+ * @param job: Job context that threads will run in.
  *
  */
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
@@ -48,13 +52,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                        internal var krawlQueues: List<KrawlQueueIf>? = null,
                        robotsConfig: RobotsConfig? = null,
                        private val requestProvider: RequestProviderIf = Requests(config),
-                       private val threadpool: ThreadPoolExecutor = ThreadPoolExecutor(
-                               config.numThreads,
-                               config.numThreads,
-                               config.emptyQueueWaitTime,
-                               TimeUnit.SECONDS,
-                               LinkedBlockingQueue<Runnable>(config.maximumQueueSize),
-                               NoopTaskRejector())) {
+                       private val job: Job = Job()) {
 
     private val logger: Logger = LogManager.getLogger()
 
@@ -69,15 +67,20 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             val histDao: KrawlHistoryHSQLDao = krawlHistory as KrawlHistoryHSQLDao
 
             if (krawlQueues == null)
-                krawlQueues = (0 until config.numThreads).map {
+                // TODO: Dynamic number of queues? Why 10?
+                krawlQueues = (0 until 10).map {
                     KrawlQueueHSQLDao("queue$it", hsqlConnection.hsqlSession, histDao)
                 }
 
         }
-        logger.debug("Krawler initialized with ${config.numThreads} threads.")
+
+        job.invokeOnCompletion {
+            logger.debug("Ending here... (job is no longer active)!!!!")
+            onCrawlEnd()
+        }
     }
 
-    internal val scheduledQueue: ScheduledQueue = ScheduledQueue(krawlQueues!!, config)
+    internal val scheduledQueue: ScheduledQueue = ScheduledQueue(krawlQueues!!, config, job)
 
     /**
      * Handle robots.txt
@@ -138,7 +141,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * This can be overridden to take action on content fetch errors.
      *
      * @param url KrawlUrl: The URL that failed
-     * @param error ContentFetchError: The content fetch error that was thrown.
+     * @param reason String: An error message or reason for the error.
      */
     open protected fun onContentFetchError(url: KrawlUrl, reason: String) {
         return
@@ -186,9 +189,10 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * of the crawl.
      *
      * @param: seedUrl List<String>: A list of seed URLs
+     * @param: blocking [Boolean]: (default true) whether to block until completion or immediately return
      *
      */
-    fun start(seedUrl: List<String>) {
+    fun start(seedUrl: List<String>, blocking: Boolean = true) = runBlocking(CommonPool) {
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
@@ -197,10 +201,16 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
 
         onCrawlStart()
-        (1..krawlUrls.size).forEach { threadpool.submit { withSafety(this::doCrawl) } }
-        while(!threadpool.isTerminated && threadpool.activeCount > 0) { Thread.sleep(250) }
-        threadpool.shutdown()
-        onCrawlEnd()
+        val urls: Channel<KrawlQueueEntry> = scheduledQueue.krawlQueueEntryChannel
+		repeat(krawlQueues!!.size) {
+		    launch(CommonPool + job) {
+    		    val actions: ProducerJob<KrawlAction> = produceKrawlActions(urls)
+	    		doCrawl(actions)
+			}
+		}
+
+        if (blocking)
+            job.join()
     }
 
     /**
@@ -220,15 +230,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @param: seedUrl List<String>: A list of seed URLs
      */
     fun startNonblocking(seedUrl: List<String>) {
-        // Convert all URLs to KrawlUrls
-        val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
-
-        krawlUrls.forEach {
-            scheduledQueue.push(it.domain, listOf(KrawlQueueEntry(it.canonicalForm)))
-        }
-
-        onCrawlStart()
-        (1..krawlUrls.size).forEach { threadpool.submit { doCrawl() } }
+        start(seedUrl, false)
     }
 
 
@@ -238,114 +240,133 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @return: true if threadpool is active, false otherwise
      */
     fun isActive(): Boolean {
-        return threadpool.activeCount > 0
+        return job.isActive
     }
 
     /**
      * Attempts to stop Krawler by gracefully shutting down. All current threads will finish
      * executing.
      */
-    fun stop() = threadpool.shutdown()
-
-    /**
-     * Attempts to stop Krawler by forcing a shutdown. Threads may be killed mid-execution.
-     */
-    fun shutdown(): MutableList<Runnable> = threadpool.shutdownNow()
+    fun stop() = job.cancel()
 
     /**
      * Private members
      */
-    // Lock for the synchronized block to determine when to stop
-    private val syncLock: Any = Any()
 
-    /** This should be utilized within a locked or synchronized block **/
-    var visitCount: Int = 0
-        private set
-
-    // Set of redirect codes
-    private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
-
-    /**
-     * Utility function to recover from unhandled runtime exceptions.
-     * Simply logs the exception and then throws the function back to the threadpool for execution.
-     * Primary use case is with the doCrawl method to ensure we don't end prematurely and are getting errors logged.
-     */
-    private fun withSafety(fn: () -> Unit) {
-        try {
-            fn()
-        } catch (e: Throwable) {
-            logger.error("Caught exception: ${e::class.qualifiedName}. Message: ${e.message}")
-            logger.error(e)
-            threadpool.submit { withSafety(fn) }
-        }
+    internal sealed class KrawlAction {
+        data class Visit(val krawlUrl: KrawlUrl, val doc: KrawlDocument): KrawlAction()
+        data class Check(val krawlUrl: KrawlUrl, val statusCode: Int): KrawlAction()
+        class Noop: KrawlAction()
     }
 
-    internal fun doCrawl() {
-        val entry: KrawlQueueEntry = scheduledQueue.pop() ?: return
+    internal val visitCount: AtomicInteger = AtomicInteger(0)
 
-        val krawlUrl: KrawlUrl = KrawlUrl.new(entry.url)
-        val depth: Int = entry.depth
-        val parent: KrawlUrl = KrawlUrl.new(entry.parent.url)
+    internal suspend fun produceKrawlActions(entries: ReceiveChannel<KrawlQueueEntry>): ProducerJob<KrawlAction>
+            = produce(CommonPool + job) {
+
+		while(true) {
+			// This is where we'll die bomb out if we don't receive an entry after some time
+			var timeoutCounter: Long = 0
+    	    while(entries.isEmpty) {
+			    if (timeoutCounter++ == config.emptyQueueWaitTime) {
+				    logger.debug("Closing channel after timeout reached")
+				    channel.close()
+                    job.cancel()
+                    return@produce
+				}
+				delay(1000)
+			}
+			
+		    val (url, parent, depth) = entries.receive()
+
+            val krawlUrl: KrawlUrl = KrawlUrl.new(url)
+            val parentKrawlUrl: KrawlUrl = KrawlUrl.new(parent.url)
+
+            val action: KrawlAction  = fetch(krawlUrl, depth, parentKrawlUrl).await()
+
+            if (action !is KrawlAction.Noop) {
+			    if (visitCount.getAndIncrement() >= config.totalPages && config.totalPages > 0) {
+                    logger.debug("Closing produceKrawlActions")
+					job.cancel()
+					return@produce
+                }
+			}
+			
+            send(action)
+		}
+    }
+
+    internal fun fetch(krawlUrl: KrawlUrl, depth: Int, parent: KrawlUrl): Deferred<KrawlAction>
+            = async(CommonPool + job) {
 
         // Make sure we're within depth limit
         if (depth >= config.maxDepth && config.maxDepth != -1) {
-            threadpool.submit { withSafety(this::doCrawl) }
-            return
+            logger.debug("Max depth!")
+            return@async KrawlAction.Noop()
         }
 
+        // Do a history check
         val history: KrawlHistoryEntry =
                 if (krawlHistory!!.hasBeenSeen(krawlUrl)) { // If it has been seen
                     onRepeatVisit(krawlUrl, parent)
-                    threadpool.submit { withSafety(this::doCrawl) }
-                    return
+                    logger.debug("History says no")
+                    return@async KrawlAction.Noop()
                 } else {
                     krawlHistory!!.insert(krawlUrl)
                 }
 
-        // If we're supposed to visit this, get the HTML and call visit
         val visit = shouldVisit(krawlUrl)
         val check = shouldCheck(krawlUrl)
 
         if (visit || check) {
             // If we're respecting robots.txt check if it's ok to visit this page
             if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl)) {
-                threadpool.submit { withSafety(this::doCrawl) }
-                return
-            }
-            // Check if we should continue crawling
-            synchronized(syncLock) {
-                if ((++visitCount > config.totalPages) && (config.totalPages > -1)) return
+                logger.debug("Robots says no")
+                return@async KrawlAction.Noop()
             }
 
-            val doc: RequestResponse = requestProvider.getUrl(krawlUrl)
+            val doc: RequestResponse = if (visit) {
+                requestProvider.getUrl(krawlUrl)
+            } else {
+                requestProvider.checkUrl(krawlUrl)
+            }
 
             // If there was an error on trying to get the doc, call content fetch error
             if (doc is ErrorResponse) {
                 onContentFetchError(krawlUrl, doc.reason)
-                threadpool.submit { withSafety(this::doCrawl) }
-                return
+                logger.debug("Content fetch error!")
+                return@async KrawlAction.Noop()
             }
 
             // If there was an error parsing the response, still a content fetch error
             if (doc !is KrawlDocument) {
                 onContentFetchError(krawlUrl, "Krawler was unable to parse the response from the server.")
-                threadpool.submit { withSafety(this::doCrawl) }
-                return
+                logger.debug("content fetch error2")
+                return@async KrawlAction.Noop()
             }
 
             val links = harvestLinks(doc, krawlUrl, history, depth)
-
             scheduledQueue.push(krawlUrl.domain, links)
 
-            // Finally call visit
             if (visit)
-                visit(krawlUrl, doc)
-
-            if (check)
-                check(krawlUrl, doc.statusCode)
+                return@async KrawlAction.Visit(krawlUrl, doc)
+            else
+                return@async KrawlAction.Check(krawlUrl, doc.statusCode)
         }
 
-        threadpool.submit { withSafety(this::doCrawl) }
+        return@async KrawlAction.Noop()
+    }
+
+    // Set of redirect codes
+    private val redirectCodes: Set<Int> = setOf(300, 301, 302, 303, 307, 308)
+
+    internal suspend fun doCrawl(channel: ReceiveChannel<KrawlAction>) {
+        channel.consumeEach { action ->
+            when(action) {
+                is KrawlAction.Visit -> visit(action.krawlUrl, action.doc)
+                is KrawlAction.Check -> check(action.krawlUrl, action.statusCode)
+            }
+        }
     }
 
     /**
@@ -357,8 +378,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      *
      * @return a list of [KrawlQueueEntry] containing the URLs to crawl
      */
-    internal fun harvestLinks(doc: KrawlDocument, url: KrawlUrl,
-                              history: KrawlHistoryEntry, depth: Int): List<KrawlQueueEntry> {
+    internal suspend fun harvestLinks(doc: KrawlDocument, url: KrawlUrl,
+                                      history: KrawlHistoryEntry, depth: Int): List<KrawlQueueEntry> {
 
         // Handle redirects by getting the location tag of the header and pushing that into the queue
         if (!config.useFastRedirectStrategy && doc.statusCode in redirectCodes && config.followRedirects) {
@@ -367,7 +388,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             val location: KrawlUrl = KrawlUrl.new(locStr, url)
 
             // We won't count it as a visit sinc
-            synchronized(syncLock) { visitCount-- }
+            visitCount.decrementAndGet()
 
             return listOf(KrawlQueueEntry(location.canonicalForm, history, depth))
         }

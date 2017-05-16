@@ -19,9 +19,6 @@
 package io.thelandscape.krawler.crawler
 
 class KrawlConfig(
-        // Size of crawler threadpool
-        // Default: -1 (unlimited)
-        val numThreads: Int = 1,
         // Maximum crawl depth
         // Default: -1 (unlimited)
         val maxDepth: Int = -1,

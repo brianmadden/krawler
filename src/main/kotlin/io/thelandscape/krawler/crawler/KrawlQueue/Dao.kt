@@ -27,7 +27,6 @@ import com.github.andrewoma.kwery.mapper.*
 import com.github.andrewoma.kwery.mapper.util.camelToLowerUnderscore
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.History.KrawlHistoryHSQLDao
-import java.util.concurrent.TimeUnit
 
 object historyConverter :
         SimpleConverter<KrawlHistoryEntry>( { row, c -> KrawlHistoryEntry(row.long(c)) }, KrawlHistoryEntry::id)
@@ -61,7 +60,6 @@ class KrawlQueueHSQLDao(name: String,
                 "(url VARCHAR(2048) NOT NULL, parent INT, depth INT, timestamp TIMESTAMP)")
     }
 
-    private val syncLock = Any()
     override fun pop(): KrawlQueueEntry? {
         val historyEntry = Type(KrawlHistoryEntry::id, { histDao.findByIds(it) })
         val queueEntry = Type(
@@ -75,12 +73,11 @@ class KrawlQueueHSQLDao(name: String,
 
         val selectSql = "SELECT TOP 1 $columns FROM ${table.name}"
         var out: List<KrawlQueueEntry> = listOf()
-        // Synchronize this to prevent race conditions between popping and deleting
-        synchronized(syncLock) {
-            out = session.select(selectSql, mapper = table.rowMapper())
-            if (out.isNotEmpty())
-                session.update("DELETE FROM ${table.name} WHERE url = :id", mapOf("id" to out.first().url))
-        }
+
+        // No need to synchronize here, current implementation only uses a single thread to pop URLs
+        out = session.select(selectSql, mapper = table.rowMapper())
+        if (out.isNotEmpty())
+            session.update("DELETE FROM ${table.name} WHERE url = :id", mapOf("id" to out.first().url))
 
         return out.fetch(Node.all).firstOrNull()
     }

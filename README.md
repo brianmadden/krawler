@@ -1,5 +1,5 @@
-[![Release](https://jitpack.io/v/brianmadden/krawler.svg)]
-(https://jitpack.io/#brianmadden/krawler) [![Build Status](https://travis-ci.org/brianmadden/krawler.svg?branch=master)](https://travis-ci.org/brianmadden/krawler)
+[![Release](https://jitpack.io/v/brianmadden/krawler.svg)](https://jitpack.io/#brianmadden/krawler) 
+[![Build Status](https://travis-ci.org/brianmadden/krawler.svg?branch=master)](https://travis-ci.org/brianmadden/krawler)
 
 About
 =====
@@ -37,7 +37,7 @@ to use Krawler in your project:
         maven { url "https://jitpack.io" }
    }
    dependencies {
-         compile 'com.github.brianmadden:krawler:0.3.2'
+         compile 'com.github.brianmadden:krawler:0.4.0'
    }
 
 ```
@@ -67,15 +67,14 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
         return (!FILTERS.matches(withoutGetParams) && url.host in whitelist)
     }
 
-    private var counter: Int = 0
-    private val counterLock: Any = Any()
+    private val counter: AtomicInteger = AtomicInteger(0)
 
     override fun visit(url: KrawlUrl, doc: KrawlDocument) {
-        println("${synchronized(counterLock) {++counter}}. Crawling ${url.canonicalForm}")
+        println("${counter.incrementAndGet()}. Crawling ${url.canonicalForm}")
     }
 
     override fun onContentFetchError(url: KrawlUrl, reason: String) {
-        println("${synchronized(counterLock) {++counter}}. Tried to crawl ${url.canonicalForm} but failed to read the content.")
+        println("${counter.incrementAndGet()}. Tried to crawl ${url.canonicalForm} but failed to read the content.")
     }
 
     private var startTimestamp: Long = 0
@@ -93,12 +92,20 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
 Roadmap
 =======
-* Updates to make use of new features in Kotlin 1.1
 * Proxy support
-* Selenium support for crawling Javascript driven sites
+* Headless Chrome support for crawling Javascript driven sites
 
 Release Notes
 =============
+**0.4.0 (2017-5-17)**
+- Rewrote core crawl loop to use Kotlin 1.1 coroutines. This has effectively turned the crawl process into a
+multi-stage pipeline. This architecture change has removed the necessity for some locking by removing resource 
+contention by multiple threads.
+
+- Updated the build file to build the simple example as a runnable jar
+ 
+- Minor bug fies in the KrawlUrl class.
+
 **0.3.2 (2017-3-3)**
 - Fixed a number of bugs that would result in a crashed thread, and subsequently an incorrect number of crawled pages
 as well as cause slowdowns due to a reduced number of worker threads.

@@ -206,7 +206,8 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
                     idx++
                     continue
                 } else if (idx + 2 >= path.length) {
-                    path.slice(idx + 1..path.length)
+                    idx += 2
+                    continue
                 } else {
                     path.slice(idx + 1..idx + 2)
                 }

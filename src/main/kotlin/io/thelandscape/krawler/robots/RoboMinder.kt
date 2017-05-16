@@ -18,16 +18,14 @@
 
 package io.thelandscape.krawler.robots
 
+import com.google.common.cache.Cache
 import com.google.common.cache.CacheBuilder
-import com.google.common.cache.CacheLoader
-import com.google.common.cache.LoadingCache
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestProviderIf
 import io.thelandscape.krawler.http.RequestResponse
-import io.thelandscape.krawler.http.Requests
 
 interface RoboMinderIf {
-    fun isSafeToVisit(url: KrawlUrl): Boolean
+    suspend fun isSafeToVisit(url: KrawlUrl): Boolean
 }
 
 /**
@@ -38,20 +36,13 @@ class RoboMinder(private val userAgent: String,
                  private val request: RequestProviderIf,
                  config: RobotsConfig = RobotsConfig()): RoboMinderIf {
 
-    private val rules: LoadingCache<String, (String) -> Boolean> = CacheBuilder.newBuilder()
+    private val rules: Cache<String, (String) -> Boolean> = CacheBuilder.newBuilder()
             .maximumSize(config.robotsCacheSize)
             .expireAfterAccess(config.expireAfter, config.units)
-            .build(
-                    object : CacheLoader<String, (String) -> Boolean>() {
-                        override fun load(key: String): ((String) -> Boolean) {
-                            val resp: RequestResponse = fetch(key)
-                            return process(resp)
-                        }
-                    }
-            )
+            .build()
 
 
-    internal fun fetch(host: String): RequestResponse {
+    internal suspend fun fetch(host: String): RequestResponse {
         val robotsUrl = KrawlUrl.new("$host/robots.txt")
         return request.fetchRobotsTxt(robotsUrl)
     }
@@ -64,11 +55,11 @@ class RoboMinder(private val userAgent: String,
         fun convertRules(rules: Set<String>): (String) -> Boolean {
             // If empty string is in the rules we're allowed to visit anything
             if ("" in rules)
-                return { x -> true }
+                return { _ -> true }
 
             // If * is in the rules we're not allowed to visit anything
             if ("/" in rules)
-                return { x -> false }
+                return { _ -> false }
 
             // If neither of the above were true then we just have to pay attention to specific rules
             // We can visit a page if the none of the rules are contained within the URL
@@ -80,7 +71,7 @@ class RoboMinder(private val userAgent: String,
             return convertRules(robotsTxt.disallowRules[userAgent] ?: robotsTxt.disallowRules["*"] ?: setOf())
         }
 
-        return { x -> true }
+        return { _ -> true }
     }
 
     /**
@@ -90,11 +81,15 @@ class RoboMinder(private val userAgent: String,
      *
      * @return true if safe to visit, false otherwise
      */
-    override fun isSafeToVisit(url: KrawlUrl): Boolean {
+    override suspend fun isSafeToVisit(url: KrawlUrl): Boolean {
 
         // Not bothering to lock this since it should be idempotent
         val withoutGetParams: String = url.path.split("?").firstOrNull() ?: url.path
+        if (url.hierarchicalPart !in rules.asMap()) {
+            val resp = fetch(url.hierarchicalPart)
+            rules.put(url.hierarchicalPart, process(resp))
+        }
 
-        return rules[url.hierarchicalPart].invoke(withoutGetParams)
+        return rules.getIfPresent(url.hierarchicalPart)!!.invoke(withoutGetParams)
     }
 }
