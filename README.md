@@ -1,5 +1,6 @@
 [![Release](https://jitpack.io/v/brianmadden/krawler.svg)](https://jitpack.io/#brianmadden/krawler) 
 [![Build Status](https://travis-ci.org/brianmadden/krawler.svg?branch=master)](https://travis-ci.org/brianmadden/krawler)
+[![Awesome Kotlin Badge](https://kotlin.link/awesome-kotlin.svg)](https://github.com/KotlinBy/awesome-kotlin)
 
 About
 =====
@@ -104,7 +105,7 @@ contention by multiple threads.
 
 - Updated the build file to build the simple example as a runnable jar
  
-- Minor bug fies in the KrawlUrl class.
+- Minor bug fixes in the KrawlUrl class.
 
 **0.3.2 (2017-3-3)**
 - Fixed a number of bugs that would result in a crashed thread, and subsequently an incorrect number of crawled pages
