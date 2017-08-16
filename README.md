@@ -38,7 +38,7 @@ to use Krawler in your project:
         maven { url "https://jitpack.io" }
    }
    dependencies {
-         compile 'com.github.brianmadden:krawler:0.4.0'
+         compile 'com.github.brianmadden:krawler:0.4.1'
    }
 
 ```
@@ -98,6 +98,11 @@ Roadmap
 
 Release Notes
 =============
+**0.4.1 (2017-8-15)**
+- Removed logging implementation from dependencies to prevent logging conflicts when used as a library.
+- Updated Kotlin version to 1.1.4
+- Updated `kotlinx.coroutines` to .17
+
 **0.4.0 (2017-5-17)**
 - Rewrote core crawl loop to use Kotlin 1.1 coroutines. This has effectively turned the crawl process into a
 multi-stage pipeline. This architecture change has removed the necessity for some locking by removing resource 
