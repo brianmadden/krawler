@@ -35,7 +35,7 @@ project(":") {
     dependencies {
         compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
         compile "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
-        compile 'org.jetbrains.kotlinx:kotlinx-coroutines-core:0.17'
+        compile 'org.jetbrains.kotlinx:kotlinx-coroutines-core:0.18'
 
         compile "org.apache.httpcomponents:httpclient:4.5.2"
         compile group: 'org.hsqldb', name: 'hsqldb', version: '2.3.4'

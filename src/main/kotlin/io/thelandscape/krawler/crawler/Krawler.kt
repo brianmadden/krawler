@@ -363,8 +363,10 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     internal suspend fun doCrawl(channel: ReceiveChannel<KrawlAction>) {
         channel.consumeEach { action ->
             when(action) {
-                is KrawlAction.Visit -> visit(action.krawlUrl, action.doc)
-                is KrawlAction.Check -> check(action.krawlUrl, action.statusCode)
+                is KrawlAction.Visit ->
+                    async(CommonPool + job) { visit(action.krawlUrl, action.doc) }.await()
+                is KrawlAction.Check ->
+                    async(CommonPool + job) { check(action.krawlUrl, action.statusCode) }.await()
             }
         }
     }
