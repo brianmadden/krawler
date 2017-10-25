@@ -398,6 +398,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 // Anchor tags
                 doc.anchorTags
                         .filterNot { it.attr("href").startsWith("#") }
+                        .filterNot { it.attr("href").startsWith("tel") }
+                        .filterNot { it.attr("href").startsWith("javascript") }
                         .filter { it.attr("href").length <= 2048 }
                         .map { KrawlUrl.new(it.attr("href"), url) }
                         .filter { it.canonicalForm.isNotBlank() }
