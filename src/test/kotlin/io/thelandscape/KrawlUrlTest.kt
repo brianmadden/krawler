@@ -22,7 +22,9 @@ import io.thelandscape.krawler.http.KrawlUrl
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.junit.Test
-import kotlin.test.*
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class KrawlUrlTest {
 
@@ -33,6 +35,12 @@ class KrawlUrlTest {
     val rawUrl = "HTTP://www.xyz.ABC.com:80/../%7Ezyxzzy/./abc%3a"
     val testUrl = KrawlUrl.new(rawUrl)
     val anchorTestUrl = KrawlUrl.new(doc)
+
+    @Test fun testSpacesInURLs() {
+        assertEquals("http://www.google.com/a%20bc.html",
+                KrawlUrl.new("http://www.google.com/a bc.html").canonicalForm)
+        assertEquals("http:///tel:867%205309", KrawlUrl.new("tel:867 5309").canonicalForm)
+    }
 
     @Test fun testHierarchicalPart() {
         assertEquals("http://www.xyz.abc.com", testUrl.hierarchicalPart)

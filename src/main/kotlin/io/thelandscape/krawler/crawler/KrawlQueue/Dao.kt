@@ -67,15 +67,14 @@ class KrawlQueueHSQLDao(name: String,
                 { this.findByIds(it) },
                 listOf(Property(KrawlQueueEntry::parent,  historyEntry, { it.parent.id }, { c, t -> c.copy(parent = t) })))
 
-        val fetcher: GraphFetcher = GraphFetcher(setOf(queueEntry, historyEntry))
+        val fetcher = GraphFetcher(setOf(queueEntry, historyEntry))
 
         fun <T> Collection<T>.fetch(node: Node) = fetcher.fetch(this, Node(node))
 
         val selectSql = "SELECT TOP 1 $columns FROM ${table.name}"
-        var out: List<KrawlQueueEntry> = listOf()
 
         // No need to synchronize here, current implementation only uses a single thread to pop URLs
-        out = session.select(selectSql, mapper = table.rowMapper())
+        val out: List<KrawlQueueEntry> = session.select(selectSql, mapper = table.rowMapper())
         if (out.isNotEmpty())
             session.update("DELETE FROM ${table.name} WHERE url = :id", mapOf("id" to out.first().url))
 

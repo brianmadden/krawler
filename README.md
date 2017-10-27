@@ -38,7 +38,7 @@ to use Krawler in your project:
         maven { url "https://jitpack.io" }
    }
    dependencies {
-         compile 'com.github.brianmadden:krawler:0.4.1'
+         compile 'com.github.brianmadden:krawler:0.4.2'
    }
 
 ```
@@ -98,6 +98,11 @@ Roadmap
 
 Release Notes
 =============
+**0.4.2 (2017-10-25)**
+- Updated to Kotlin Runtime 1.1.51, kotlinx-coroutines 0.19.2
+- Reworked KrawlUrl class internals to handle spaces in URLs better which should result in
+more stability when crawling.
+
 **0.4.1 (2017-8-15)**
 - Removed logging implementation from dependencies to prevent logging conflicts when used as a library.
 - Updated Kotlin version to 1.1.4

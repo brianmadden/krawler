@@ -389,7 +389,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             val locStr: String = doc.headers["location"] ?: return listOf()
             val location: KrawlUrl = KrawlUrl.new(locStr, url)
 
-            // We won't count it as a visit sinc
+            // We won't count it as a visit since we didn't get any content
             visitCount.decrementAndGet()
 
             return listOf(KrawlQueueEntry(location.canonicalForm, history, depth))
@@ -402,7 +402,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                         .filterNot { it.attr("href").startsWith("#") }
                         .filter { it.attr("href").length <= 2048 }
                         .map { KrawlUrl.new(it.attr("href"), url) }
-                        .filter { it.canonicalForm.isNotBlank() }
+                        .filter { it != InvalidKrawlUrl && it.canonicalForm.isNotBlank() }
                         .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1) },
                 // Everything else (img tags, scripts, etc)d
                 doc.otherOutgoingLinks
