@@ -89,6 +89,9 @@ class KrawlUrl private constructor(val rawUrl: String,
                     listOf(0x2D, 0x2E, 0x5F, 0x7E))
                     .flatten()
 
+            // Used for blacklisting known bad schemes
+            val blacklist: List<String> = listOf("mailto", "javascript", "tel", "file", "data", "irc", "ftp")
+
             while(idx < url.length) {
                 val c = url[idx]
 
@@ -109,6 +112,8 @@ class KrawlUrl private constructor(val rawUrl: String,
                         // websites. This isn't *technically* correct, but neither are a lot of URLs we find :-/
                         if (validator.matches(slice) && (slice == "http" || slice == "https"))
                             scheme = slice
+                        else if (slice in blacklist)
+                            return InvalidKrawlUrl
                         else
                             break
 
@@ -118,7 +123,7 @@ class KrawlUrl private constructor(val rawUrl: String,
 
                             // If we have a string of / leave only 2
                             var n: Int = 3
-                            while (url[idx + n] == '/') n++
+                            while ((idx + n) < url.length && url[idx + n] == '/') n++
                             // Move idx by n to the start of the host portion
                             idx += n
                             // Start the host after the scheme

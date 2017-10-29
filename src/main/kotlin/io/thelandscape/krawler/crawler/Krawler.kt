@@ -58,7 +58,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
     init {
         if (krawlHistory == null || krawlQueues == null) {
-            val hsqlConnection: HSQLConnection = HSQLConnection(config.persistentCrawl, config.crawlDirectory)
+            val hsqlConnection = HSQLConnection(config.persistentCrawl, config.crawlDirectory)
 
             if (krawlHistory == null)
                 krawlHistory = KrawlHistoryHSQLDao(hsqlConnection.hsqlSession)
@@ -341,7 +341,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             // If there was an error parsing the response, still a content fetch error
             if (doc !is KrawlDocument) {
                 onContentFetchError(krawlUrl, "Krawler was unable to parse the response from the server.")
-                logger.debug("content fetch error2")
+                logger.debug("Content fetch error!")
                 return@async KrawlAction.Noop()
             }
 
