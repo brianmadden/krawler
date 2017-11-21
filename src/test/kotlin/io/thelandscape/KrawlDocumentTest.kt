@@ -18,8 +18,6 @@ package io.thelandscape
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import com.nhaarman.mockito_kotlin.mock
-import com.nhaarman.mockito_kotlin.whenever
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RedirectHistoryNode

@@ -18,10 +18,18 @@
 
 package io.thelandscape.krawler.crawler.KrawlQueue
 
+import java.time.LocalDateTime
+
 /**
  * Interface representing a KrawlQueue
  */
 interface KrawlQueueIf {
+    // Pop an entry from the queue
     fun pop (): KrawlQueueEntry?
+    // Push an entry on the queue
     fun push (urls: List<KrawlQueueEntry>): List<KrawlQueueEntry>
+    // Delete all entries with specific root page ID
+    fun deleteByRootPageId (rootPageId: Int): Int
+    // Delete all entries older than beforeTime
+    fun deleteByAge(beforeTime: LocalDateTime): Int
 }

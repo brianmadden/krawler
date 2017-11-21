@@ -38,7 +38,7 @@ to use Krawler in your project:
         maven { url "https://jitpack.io" }
    }
    dependencies {
-         compile 'com.github.brianmadden:krawler:0.4.2'
+         compile 'com.github.brianmadden:krawler:0.4.3'
    }
 
 ```
@@ -98,6 +98,14 @@ Roadmap
 
 Release Notes
 =============
+**0.4.3 (2017-11-20)**
+- Added ability to clear crawl queues by RequestId and Age, see `Krawler#removeUrlsByRootPage` 
+  and `Krawler#removeUrlsByAge`
+- Added config option to prevent crawler shutdown on empty queues
+- Added new single byte priority field to `KrawlQueueEntry`. Queues will always attempt to pop the `lowest` priority
+  entry available. Priority can be assigned by overriding the `Krawler#assignQueuePriorty` method.
+- Update dependencies
+
 **0.4.2 (2017-10-25)**
 - Updated to Kotlin Runtime 1.1.51, kotlinx-coroutines 0.19.2
 - Reworked KrawlUrl class internals to handle spaces in URLs better which should result in

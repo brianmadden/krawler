@@ -27,6 +27,9 @@ import com.github.andrewoma.kwery.mapper.*
 import com.github.andrewoma.kwery.mapper.util.camelToLowerUnderscore
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.History.KrawlHistoryHSQLDao
+import java.sql.Timestamp
+import java.time.LocalDateTime
+import java.util.concurrent.atomic.AtomicInteger
 
 object historyConverter :
         SimpleConverter<KrawlHistoryEntry>( { row, c -> KrawlHistoryEntry(row.long(c)) }, KrawlHistoryEntry::id)
@@ -36,14 +39,17 @@ class KrawlQueueTable(name: String) : Table<KrawlQueueEntry, String>(name,
                 standardConverters + timeConverters + reifiedConverter(historyConverter), camelToLowerUnderscore)) {
 
     val Url by col(KrawlQueueEntry::url, id = true)
+    val RootPageId by col(KrawlQueueEntry::rootPageId)
     val Parent by col (KrawlQueueEntry::parent)
     val Depth by col(KrawlQueueEntry::depth)
+    val Priority by col(KrawlQueueEntry::priority)
     val Timestamp by col(KrawlQueueEntry::timestamp)
 
     override fun idColumns(id: String) = setOf(Url of id)
 
     override fun create(value: Value<KrawlQueueEntry>) =
-            KrawlQueueEntry(value of Url, value of Parent, value of Depth, value of Timestamp)
+            KrawlQueueEntry(value of Url, value of RootPageId, value of Parent,
+                    value of Depth, value of Priority, value of Timestamp)
 
 }
 
@@ -51,13 +57,15 @@ class KrawlQueueTable(name: String) : Table<KrawlQueueEntry, String>(name,
 // rather than an HSQLDao while keeping the interface clean
 class KrawlQueueHSQLDao(name: String,
                         session: Session,
-                        private val histDao: KrawlHistoryHSQLDao):
+                        private val histDao: KrawlHistoryHSQLDao = KrawlHistoryHSQLDao(session)):
         KrawlQueueIf, AbstractDao<KrawlQueueEntry, String>(session, KrawlQueueTable(name), KrawlQueueEntry::url) {
 
     init {
         // Create queue table
         session.update("CREATE TABLE IF NOT EXISTS $name " +
-                "(url VARCHAR(2048) NOT NULL, parent INT, depth INT, timestamp TIMESTAMP)")
+                "(url VARCHAR(2048) NOT NULL, root_page_id INT, parent INT, depth INT, priority TINYINT, timestamp TIMESTAMP)")
+
+        session.update("CREATE INDEX ${name}PriorityIdx ON $name (priority)")
     }
 
     override fun pop(): KrawlQueueEntry? {
@@ -71,7 +79,7 @@ class KrawlQueueHSQLDao(name: String,
 
         fun <T> Collection<T>.fetch(node: Node) = fetcher.fetch(this, Node(node))
 
-        val selectSql = "SELECT TOP 1 $columns FROM ${table.name}"
+        val selectSql = "SELECT TOP 1 $columns FROM ${table.name} WHERE priority = (SELECT MIN(priority) FROM ${table.name})"
 
         // No need to synchronize here, current implementation only uses a single thread to pop URLs
         val out: List<KrawlQueueEntry> = session.select(selectSql, mapper = table.rowMapper())
@@ -86,5 +94,14 @@ class KrawlQueueHSQLDao(name: String,
             return this.batchInsert(urls)
 
         return listOf()
+    }
+
+    override fun deleteByRootPageId(rootPageId: Int): Int {
+        return session.update("DELETE FROM ${table.name} WHERE root_page_id = :id", mapOf("id" to rootPageId))
+    }
+
+    override fun deleteByAge(beforeTime: LocalDateTime): Int {
+        return session.update("DELETE FROM ${table.name} WHERE timestamp < :beforeTime",
+                mapOf("beforeTime" to Timestamp.valueOf(beforeTime)))
     }
 }

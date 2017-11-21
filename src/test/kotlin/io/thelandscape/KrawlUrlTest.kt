@@ -18,6 +18,7 @@ package io.thelandscape
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import io.thelandscape.krawler.http.InvalidKrawlUrl
 import io.thelandscape.krawler.http.KrawlUrl
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
@@ -39,7 +40,7 @@ class KrawlUrlTest {
     @Test fun testSpacesInURLs() {
         assertEquals("http://www.google.com/a%20bc.html",
                 KrawlUrl.new("http://www.google.com/a bc.html").canonicalForm)
-        assertEquals("http:///tel:867%205309", KrawlUrl.new("tel:867 5309").canonicalForm)
+        assertEquals(InvalidKrawlUrl, KrawlUrl.new("tel:867 5309"))
     }
 
     @Test fun testHierarchicalPart() {
