@@ -51,7 +51,7 @@ the crawler, and the `visit` method dictates what happens once the page is visit
 two methods is sufficient for creating your own crawler, however there are additional methods that
 can be overridden to privde more robust behavior.
 
-The full code for this simple example can also be found in the [example project](...):
+The full code for this simple example can also be found in the [example project](https://github.com/brianmadden/krawler/tree/master/example/src/main/kotlin):
 ```kotlin
 class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
