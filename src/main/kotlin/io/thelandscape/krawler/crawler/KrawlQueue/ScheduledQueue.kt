@@ -24,10 +24,9 @@ import com.google.common.cache.LoadingCache
 import io.thelandscape.krawler.crawler.KrawlConfig
 import kotlinx.coroutines.experimental.*
 import kotlinx.coroutines.experimental.channels.Channel
-import kotlinx.coroutines.experimental.channels.ProducerJob
-import kotlinx.coroutines.experimental.channels.produce
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
+import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
 
 class ScheduledQueue(private val queues: List<KrawlQueueIf>,
@@ -95,4 +94,22 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>,
             krawlQueueEntryChannel.send(entry)
         }
     }
+
+    /**
+     * Removes all queue entries with specified rootPageId
+     *
+     * @param rootPageId Int: The id of the root page
+     *
+     * @return the number of entries removed
+     */
+    fun deleteByRootPageId(rootPageId: Int): Int = queues.map { it.deleteByRootPageId(rootPageId) }.sum()
+
+    /**
+     * Removes all queue entries that are older than timestamp.
+     *
+     * @param timestamp LocalDateTime: Delete all entries prior to this timestamp
+     *
+     * @return the number of entries removed
+     */
+    fun deleteByAge(beforeTime: LocalDateTime): Int = queues.map { it.deleteByAge(beforeTime) }.sum()
 }

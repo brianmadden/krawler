@@ -46,7 +46,7 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
     }
 
     override fun onContentFetchError(url: KrawlUrl, reason: String) {
-        println("${counter.incrementAndGet()}. Tried to crawl ${url.canonicalForm} but failed to read the content.")
+        println("Tried to crawl ${url.canonicalForm} but failed to read the content.")
     }
 
     private var startTimestamp: Long = 0

@@ -21,7 +21,16 @@ package io.thelandscape.krawler.crawler.KrawlQueue
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import java.time.LocalDateTime
 
-data class KrawlQueueEntry(val url: String,
-                           val parent: KrawlHistoryEntry = KrawlHistoryEntry(),
-                           val depth: Int = 0,
-                           val timestamp: LocalDateTime = LocalDateTime.now())
+data class KrawlQueueEntry(
+        // The target crawl URL
+        val url: String,
+        // The ID of the  start URL that lead to this page
+        val rootPageId: Int,
+        // Direct parent of this page in the crawl
+        val parent: KrawlHistoryEntry = KrawlHistoryEntry(),
+        // Depth of the entry
+        val depth: Int = 0,
+        // Priority
+        val priority: Byte = 0,
+        // Timestamp entry was added to the queue
+        val timestamp: LocalDateTime = LocalDateTime.now())

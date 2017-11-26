@@ -29,246 +29,265 @@ import org.jsoup.nodes.Element
  *
  */
 
-class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
+val InvalidKrawlUrl = KrawlUrl.new("", null)
+
+class KrawlUrl private constructor(val rawUrl: String,
+                                   val anchorText: String? = null,
+                                   val anchorAttributes: Map<String, String>? = null,
+                                   val wasExtractedFromAnchor: Boolean = false,
+        // http://www.ietf.org/rfc/rfc2396.txt
+        // URI syntax: [scheme:]scheme-specific-part[#fragment]
+        // Absolute URLs start with a / immediately after the scheme portion
+                                   val isAbsolute: Boolean = false,
+                                   val scheme: String = "http",
+        // Host is the part between the :// and the first /
+                                   val host: String = "",
+                                   val port: Int = 0,
+                                   val path: String = rawUrl,
+                                   val parent: KrawlUrl? = null) {
 
     companion object {
+
         fun new(url: String, parent: KrawlUrl? = null): KrawlUrl {
-            return KrawlUrl(url, parent)
+            return parse(url, parent)
         }
 
         fun new(anchor: Element, parent: KrawlUrl? = null): KrawlUrl {
             if (anchor.tagName() != "a" && !anchor.hasAttr("href"))
-                return KrawlUrl("", parent)
-            return KrawlUrl(anchor, parent)
+                return InvalidKrawlUrl
+            return parse(anchor.attr("href"),
+                    parent,
+                    true,
+                    anchor.text() ?: "",
+                    anchor.attributes().associateBy({ it.key.toLowerCase() }, { it.value })
+            )
         }
-    }
 
-    // All of these setters will be private so that we can't set these from the outside
-    var wasExtractedFromAnchor = false
-        private set
+        private fun parse(url: String, parent: KrawlUrl?,
+                          wasExtractedFromAnchor: Boolean = false,
+                          anchorText: String? = null,
+                          anchorAttributes: Map<String, String>? = null): KrawlUrl {
+            var host = ""
+            var port = 0
+            var path = url
+            var scheme = "http"
+            var isAbsolute = false
 
-    var anchorText: String? = null
-        private set
+            // Process the URL in one shot as best we can by treating it like a big state machine
+            // This will handle the normalization process in-line to prevent excessive string mutations
+            var idx = 0
+            var hostStart = 0
+            var nonHostSlashSeen = false
+            var hostFound = false
+            var firstColonFound = false
 
-    var anchorAttributes: Map<String, String>? = null
-        private set
+            // Used for decoding encoded characters
+            val replaceList: List<Int> = listOf(
+                    (0x41..0x5A),
+                    (0x61..0x7A),
+                    (0x30..0x39),
+                    listOf(0x2D, 0x2E, 0x5F, 0x7E))
+                    .flatten()
 
-    // Constructor used when we pass a full anchor tag in
-    private constructor(anchor: Element, parent: KrawlUrl?): this(anchor.attr("href"), parent) {
+            // Used for blacklisting known bad schemes
+            val blacklist: List<String> = listOf("mailto", "javascript", "tel", "file", "data", "irc", "ftp")
 
-        wasExtractedFromAnchor = true
-        anchorText = anchor.text() ?: ""
-        anchorAttributes = anchor.attributes().associateBy({ it.key.toLowerCase() }, { it.value })
-    }
+            while(idx < url.length) {
+                val c = url[idx]
 
-    val rawUrl: String = url
+                if (c == ' ') {
+                    return InvalidKrawlUrl
+                }
 
-    // http://www.ietf.org/rfc/rfc2396.txt
-    // URI syntax: [scheme:]scheme-specific-part[#fragment]
+                // Handle isAbsolute and finding the scheme
+                if (c == ':') {
+                    if (!nonHostSlashSeen && !firstColonFound) {
+                        firstColonFound = true
 
-    // Absolute URLs start with a / immediately after the scheme portion
-    var isAbsolute: Boolean = false
-        private set
-
-    var scheme: String = "http"
-        private set
-
-    // Host is the part between the :// and the first /
-    var host: String = ""
-        private set
-
-    var port: Int = 0
-        private set
-
-    var path: String = url
-        private set
-
-    init {
-        // Process the URL in one shot as best we can by treating it like a big state machine
-        // This will handle the normalization process in-line to prevent excessive string mutations
-        var idx: Int = 0
-        var hostStart: Int = 0
-        var nonHostSlashSeen: Boolean = false
-        var hostFound: Boolean = false
-        var firstColonFound: Boolean = false
-
-        // Used for decoding encoded characters
-        val replaceList: List<Int> = listOf(
-                (0x41..0x5A),
-                (0x61..0x7A),
-                (0x30..0x39),
-                listOf(0x2D, 0x2E, 0x5F, 0x7E))
-                .flatten()
-
-        while(idx < url.length) {
-            val c = url[idx]
-
-            // Handle isAbsolute and finding the scheme
-            if (c == ':') {
-                if (!nonHostSlashSeen && !firstColonFound) {
-                    firstColonFound = true
-
-                    // If the first colon was found the scheme is everything up until then
-                    // NORMALIZE: Scheme should all be lowercase
-                    val validator: Regex = Regex("[A-Za-z][\\w+-.]*")
-                    val slice = url.slice(0 until idx).toLowerCase()
-                    // NOTE: Right now we're ignoring any scheme that isn't http or https since we're only crawling
-                    // websites. This isn't *technically* correct, but neither are a lot of URLs we find :-/
-                    if (validator.matches(slice) && (slice == "http" || slice == "https"))
-                        scheme = slice
-                    else
-                        break
+                        // If the first colon was found the scheme is everything up until then
+                        // NORMALIZE: Scheme should all be lowercase
+                        val validator = Regex("[A-Za-z][\\w+-.]*")
+                        val slice = url.slice(0 until idx).toLowerCase()
+                        // NOTE: Right now we're ignoring any scheme that isn't http or https since we're only crawling
+                        // websites. This isn't *technically* correct, but neither are a lot of URLs we find :-/
+                        if (validator.matches(slice) && (slice == "http" || slice == "https"))
+                            scheme = slice
+                        else if (slice in blacklist)
+                            return InvalidKrawlUrl
+                        else
+                            break
 
 
-                    if (url.getOrNull(idx + 1) == '/' && url.getOrNull(idx + 2) == '/') {
-                        isAbsolute = true
+                        if (url.getOrNull(idx + 1) == '/' && url.getOrNull(idx + 2) == '/') {
+                            isAbsolute = true
 
-                        // If we have a string of / leave only 2
-                        var n: Int = 3
-                        while (url[idx + n] == '/') n++
-                        // Move idx by n to the start of the host portion
-                        idx += n
-                        // Start the host after the scheme
-                        hostStart = idx
+                            // If we have a string of / leave only 2
+                            var n: Int = 3
+                            while ((idx + n) < url.length && url[idx + n] == '/') n++
+                            // Move idx by n to the start of the host portion
+                            idx += n
+                            // Start the host after the scheme
+                            hostStart = idx
+                            continue
+                        }
+                    }
+
+                    // Find the port if it's present
+                    if (!nonHostSlashSeen && !hostFound && firstColonFound) {
+                        // This should be the port
+                        var portIdxAdder = 1
+                        // Get all of the digits after the colon
+                        while (url.getOrElse(idx + portIdxAdder, { ' ' }).isDigit()) {
+                            portIdxAdder++
+                        }
+
+                        val slice = url.slice(idx + 1 until idx + portIdxAdder)
+                        port = if (slice.isNotBlank()) slice.toInt() else port
+
+                        // Increment the index and move on
+                        idx += portIdxAdder
                         continue
                     }
                 }
 
-                // Find the port if it's present
-                if (!nonHostSlashSeen && !hostFound && firstColonFound) {
-                    // This should be the port
-                    var portIdxAdder = 1
-                    // Get all of the digits after the colon
-                    while (url.getOrElse(idx + portIdxAdder, { ' ' }).isDigit()) {
-                        portIdxAdder++
+                // Everything up until the port is the host portion
+                if (c == '/') {
+                    // Handle the case where scheme is left out to be inferred from the parent
+                    if (idx == 1 && url[0] == '/' && parent != null) {
+                        scheme = parent.scheme
+                        isAbsolute = true
                     }
 
-                    val slice = url.slice(idx + 1 until idx + portIdxAdder)
-                    port = if (slice.isNotBlank()) slice.toInt() else port
+                    if (isAbsolute) {
+                        // NORMALIZATION: convert to lowercase for normalization
+                        // NORMALIZATION: Remove the port if the scheme is http
+                        host = url.slice(hostStart until idx)
+                                .toLowerCase()
+                                .replace(Regex(":[0-9]+"), "")
 
-                    // Increment the index and move on
-                    idx += portIdxAdder
-                    continue
+                        hostFound = true
+
+                        path = url.slice(idx until url.length)
+
+                        // If we've come this far we're ready to process the path
+                        break
+                    }
+                    nonHostSlashSeen = true
                 }
+
+                // Increment idx if we didn't do any special handling
+                idx++
+
+                // End the initial processing. From here we'll only process the path.
+                // This will also be treated as a state machine for single pass processing
             }
 
-            // Everything up until the port is the host portion
-            if (c == '/') {
-                // Handle the case where scheme is left out to be inferred from the parent
-                if (idx == 1 && url[0] == '/' && parent != null) {
-                    scheme = parent.scheme
-                    isAbsolute = true
-                }
-
-                if (isAbsolute) {
-                    // NORMALIZATION: convert to lowercase for normalization
-                    // NORMALIZATION: Remove the port if the scheme is http
-                    host = url.slice(hostStart until idx)
-                            .toLowerCase()
-                            .replace(Regex(":[0-9]+"), "")
-
-                    hostFound = true
-
-                    path = url.slice(idx until url.length)
-
-                    // If we've come this far we're ready to process the path
-                    break
-                }
-                nonHostSlashSeen = true
+            // If no host was found but this is an absolute URL then the host is everything after the scheme
+            if (!hostFound && isAbsolute) {
+                host = url.slice(hostStart until url.length)
+                path = "/"
+            } else if (!hostFound && !isAbsolute) {
+                // If there host was not found and it is not an absolute URL the host comes from the parent
+                // and the entire URL is just a path
+                host = parent?.host ?: ""
+                // Add a leading slash if there wasn't one
+                path = if (path.startsWith("/")) path else "/" + path
             }
 
-            // Increment idx if we didn't do any special handling
-            idx++
+            // Reset idx
+            idx = 0
+            while(idx < path.length) {
+                val c = path[idx]
 
-            // End the initial processing. From here we'll only process the path.
-            // This will also be treated as a state machine for single pass processing
-        }
-
-        // If no host was found but this is an absolute URL then the host is everything after the scheme
-        if (!hostFound && isAbsolute) {
-            host = url.slice(hostStart until url.length)
-            path = "/"
-        } else if (!hostFound && !isAbsolute) {
-            // If there host was not found and it is not an absolute URL the host comes from the parent
-            // and the entire URL is just a path
-            host = parent?.host ?: ""
-            // Add a leading slash if there wasn't one
-            path = if (path.startsWith("/")) path else "/" + path
-        }
-
-        // Reset idx
-        idx = 0
-        while(idx < path.length) {
-            val c = path[idx]
-            // Handle normalization of path from here on out
-            if (c == '%') {
-                val nextTwoChars: String = if (idx + 1  >= path.length) {
-                    idx++
+                // Handle normalization of path from here on out
+                if (c == ' ') {
+                    path = path.slice(0 until idx) + "%20" + path.slice(idx + 1 until path.length)
+                    idx += 3
                     continue
-                } else if (idx + 2 >= path.length) {
-                    idx += 2
-                    continue
-                } else {
-                    path.slice(idx + 1..idx + 2)
                 }
 
-                if (nextTwoChars.matches(Regex("[0-9a-fA-F]{2}"))) {
-                    val nextTwo: Int = Integer.parseInt(nextTwoChars, 16)
-
-                    // NORMALIZATION:
-                    // We've hit an encoded character, decide whether or not to decode (non-reserved chars)
-                    // Unreserved characters are %41-%5A, %61-7A, %30-%39, %2D, %2E, %5F, %7E
-                    if (nextTwo in replaceList) {
-                        if (idx + 3 < path.length)
-                            path = path.slice(0 until idx) + nextTwo.toChar() + path.slice(idx + 3 until path.length)
-                        else
-                            path = path.slice(0 until idx) + nextTwo.toChar()
-                        // Only increment by 1 since we replaced 3 characters with 1
+                if (c == '%') {
+                    val nextTwoChars: String = if (idx + 1  >= path.length) {
                         idx++
                         continue
+                    } else if (idx + 2 >= path.length) {
+                        idx += 2
+                        continue
+                    } else {
+                        path.slice(idx + 1..idx + 2)
+                    }
+
+                    if (nextTwoChars.matches(Regex("[0-9a-fA-F]{2}"))) {
+                        val nextTwo: Int = Integer.parseInt(nextTwoChars, 16)
+
+                        // NORMALIZATION:
+                        // We've hit an encoded character, decide whether or not to decode (non-reserved chars)
+                        // Unreserved characters are %41-%5A, %61-7A, %30-%39, %2D, %2E, %5F, %7E
+                        if (nextTwo in replaceList) {
+                            if (idx + 3 < path.length)
+                                path = path.slice(0 until idx) + nextTwo.toChar() + path.slice(idx + 3 until path.length)
+                            else
+                                path = path.slice(0 until idx) + nextTwo.toChar()
+                            // Only increment by 1 since we replaced 3 characters with 1
+                            idx++
+                            continue
+                        }
+                    }
+
+                    // NORMALIZATION: If they weren't converted make sure they're upper case
+                    path = if (idx + 3 < url.length)
+                        path.slice(0 .. idx) + nextTwoChars.toUpperCase() + path.slice(idx + 3 until path.length)
+                    else
+                        path.slice(0 .. idx) + nextTwoChars.toUpperCase()
+
+                    idx += 3
+                    continue
+                }
+
+                if (c == '/') {
+                    // TODO: Remove excess slashes after a slash
+
+                    // NORMALIZATION: Remove any /../ or /./
+                    val nextTwo = "" + path.getOrElse(idx + 1, {' '}) + path.getOrElse(idx + 2, {' '})
+
+                    if (nextTwo == "./") {
+                        path = path.slice(0 until idx) + path.slice(idx + 2 until path.length)
+
+                        continue
+                    }
+
+                    if (nextTwo == "..") {
+                        if (idx + 3 < path.length)
+                            path = path.slice(0 until idx) + path.slice(idx + 3 until path.length)
+                        else
+                            path = path.slice(0 until idx)
+
+                        continue
                     }
                 }
 
-                // NORMALIZATION: If they weren't converted make sure they're upper case
-                if (idx + 3 < url.length)
-                    path = path.slice(0 .. idx) + nextTwoChars.toUpperCase() + path.slice(idx + 3 until path.length)
-                else
-                    path = path.slice(0 .. idx) + nextTwoChars.toUpperCase()
-
-                idx += 3
-                continue
+                // If we didn't do anything, just increment the index
+                idx++
             }
 
-            if (c == '/') {
-                // TODO: Remove excess slashes after a slash
-
-                // NORMALIZATION: Remove any /../ or /./
-                val nextTwo = "" + path.getOrElse(idx + 1, {' '}) + path.getOrElse(idx + 2, {' '})
-
-                if (nextTwo == "./") {
-                    path = path.slice(0 until idx) + path.slice(idx + 2 until path.length)
-
-                    continue
-                }
-
-                if (nextTwo == "..") {
-                    if (idx + 3 < path.length)
-                        path = path.slice(0 until idx) + path.slice(idx + 3 until path.length)
-                    else
-                        path = path.slice(0 until idx)
-
-                    continue
-                }
+            // Handle URLs that didn't have a port at all
+            if (port == 0) {
+                if ("http" == scheme) port = 80
+                if ("https" == scheme) port = 443
             }
 
-            // If we didn't do anything, just increment the index
-            idx++
-        }
-
-        // Handle URLs that didn't have a port at all
-        if (port == 0) {
-            if ("http" == scheme) port = 80
-            if ("https" == scheme) port = 443
+            return KrawlUrl(
+                    url,
+                    anchorText,
+                    anchorAttributes,
+                    wasExtractedFromAnchor,
+                    isAbsolute,
+                    scheme,
+                    host,
+                    port,
+                    path,
+                    parent
+            )
         }
     }
 
@@ -297,8 +316,8 @@ class KrawlUrl private constructor(url: String, parent: KrawlUrl?) {
     // TODO: Remove duplicate / after scheme portion
     val canonicalForm: String
         get() = if (anchorAttributes != null &&
-                anchorAttributes!!.contains("rel") &&
-                anchorAttributes!!["rel"] == "canonical") rawUrl else normalForm
+                anchorAttributes.contains("rel") &&
+                anchorAttributes["rel"] == "canonical") rawUrl else normalForm
 
     override fun toString(): String = canonicalForm
 

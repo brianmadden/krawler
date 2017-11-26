@@ -129,7 +129,7 @@ class KrawlerTest {
 
     @Test fun testHarvestLinks() {
         val links: List<KrawlQueueEntry> =
-                runBlocking { testKrawler.harvestLinks(preparedResponse, exampleUrl, KrawlHistoryEntry(), 0) }
+                runBlocking { testKrawler.harvestLinks(preparedResponse, exampleUrl, KrawlHistoryEntry(), 0, 0) }
 
         assertEquals(2, links.size)
         val linksText = links.map { it.url }

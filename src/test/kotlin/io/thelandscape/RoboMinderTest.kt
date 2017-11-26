@@ -85,10 +85,10 @@ class RoboMinderTest {
     /** TODO: Turn this back on when mockito is updated to support coroutines
      * https://discuss.kotlinlang.org/t/verifying-suspending-functions-with-mockito-or-alternatives/2492/2
     @Test fun isSafeToVisit() = runBlocking<Unit> {
-        //whenever(mockRequests.fetchRobotsTxt(any())).thenReturn(specificAgentSpecificPage)
+        //whenever(mockRequests.fetchRobotsTxt(any())).thenReturn(io.thelandscape.getSpecificAgentSpecificPage)
 
-        val valid = minder.isSafeToVisit(validUrl)
-        val invalid = minder.isSafeToVisit(invalidUrl)
+        val valid = minder.isSafeToVisit(io.thelandscape.validUrl)
+        val invalid = minder.isSafeToVisit(io.thelandscape.invalidUrl)
 
         assertTrue(valid)
         assertFalse(invalid)

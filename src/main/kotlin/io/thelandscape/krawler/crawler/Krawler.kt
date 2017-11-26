@@ -34,6 +34,7 @@ import kotlinx.coroutines.experimental.*
 import kotlinx.coroutines.experimental.channels.*
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
+import java.time.LocalDateTime
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -49,16 +50,21 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                        private var krawlHistory: KrawlHistoryIf? = null,
-                       internal var krawlQueues: List<KrawlQueueIf>? = null,
+                       private var krawlQueues: List<KrawlQueueIf>? = null,
                        robotsConfig: RobotsConfig? = null,
                        private val requestProvider: RequestProviderIf = Requests(config),
                        private val job: Job = Job()) {
 
     private val logger: Logger = LogManager.getLogger()
 
+    // Map of start URL -> int id to track branches of a crawl
+    private val rootPageIds: MutableMap<String, Int> = mutableMapOf()
+    // Current Max ID
+    private val maximumUsedId: AtomicInteger = AtomicInteger(0)
+
     init {
         if (krawlHistory == null || krawlQueues == null) {
-            val hsqlConnection: HSQLConnection = HSQLConnection(config.persistentCrawl, config.crawlDirectory)
+            val hsqlConnection = HSQLConnection(config.persistentCrawl, config.crawlDirectory)
 
             if (krawlHistory == null)
                 krawlHistory = KrawlHistoryHSQLDao(hsqlConnection.hsqlSession)
@@ -80,7 +86,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
     }
 
-    internal val scheduledQueue: ScheduledQueue = ScheduledQueue(krawlQueues!!, config, job)
+    private val scheduledQueue: ScheduledQueue = ScheduledQueue(krawlQueues!!, config, job)
 
     /**
      * Handle robots.txt
@@ -123,6 +129,19 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      */
     open protected fun check(url: KrawlUrl, statusCode: Int) {
         return
+    }
+
+    /**
+     * Function is called before creating a KrawlQueueEntry and is used to determine the entry's priority.
+     *
+     * @param url KrawlUrl: The url to be prioritized
+     * @param depth Int: The depth of the node that url points to
+     * @param parent KrawlHistoryEntry: The parent page that this link was harvested from
+     *
+     * @return a byte value between 0 - 255, where 0 is the highest priority and 255 is the lowest
+     */
+    open protected fun assignQueuePriority(url: KrawlUrl, depth: Int, parent: KrawlHistoryEntry): Byte {
+        return 1
     }
 
     /**
@@ -175,13 +194,41 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     }
 
     /**
-     * Starts the Krawler with the URL provided. This method will call `onCrawlStart()`
-     * perform the crawl and then call `onCrawlEnd()`. This method will block for the duration
-     * of the crawl.
+     * Submits urls for crawling. This method can be called during an active crawl to add additional
+     * URLs to the queue.
      *
-     * @param: seedUrl String: A single seed URL
+     * @param urls List<String>: A list of URLs to add to the queue
      */
-    fun start(seedUrl: String) = start(listOf(seedUrl))
+    fun submitUrls(urls: List<String>, priority: Byte = 0) {
+        // Convert all URLs to KrawlUrls
+        val krawlUrls: List<KrawlUrl> = urls.map { KrawlUrl.new(it) }
+
+        krawlUrls.forEach {
+            val rootPageId: Int = maximumUsedId.getAndIncrement()
+            rootPageIds[it.rawUrl] = rootPageId
+            scheduledQueue.push(it.domain, listOf(KrawlQueueEntry(it.canonicalForm, rootPageId, priority = priority)))
+        }
+    }
+
+    /**
+     * Removes all queue entries that stemmed from rootUrl.
+     *
+     * @param rootUrl String: The origin URL of a crawl
+     * @return the number of entries removed from the queue
+     */
+    fun removeUrlsByRootPage(rootUrl: String): Int {
+        val id: Int = rootPageIds[rootUrl] ?: return 0
+
+        return scheduledQueue.deleteByRootPageId(id)
+    }
+
+    /**
+     * Remove all queue entries that were inserted before beforeTime.
+     *
+     * @param beforeTime LocalDateTime: Time before which all entries are removed
+     * @return the number of entries removed from the queue
+     */
+    fun removeUrlsByAge(beforeTime: LocalDateTime): Int = scheduledQueue.deleteByAge(beforeTime)
 
     /**
      * Starts the Krawler with the URLs provided. This method will call `onCrawlStart()`
@@ -197,7 +244,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
         krawlUrls.forEach {
-            scheduledQueue.push(it.domain, listOf(KrawlQueueEntry(it.canonicalForm)))
+            val rootPageId: Int = maximumUsedId.getAndIncrement()
+            rootPageIds[it.rawUrl] = rootPageId
+            scheduledQueue.push(it.domain, listOf(KrawlQueueEntry(it.canonicalForm, rootPageId)))
         }
 
         onCrawlStart()
@@ -212,6 +261,15 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         if (blocking)
             job.join()
     }
+
+    /**
+     * Starts the Krawler with the URL provided. This method will call `onCrawlStart()`
+     * perform the crawl and then call `onCrawlEnd()`. This method will block for the duration
+     * of the crawl.
+     *
+     * @param: seedUrl String: A single seed URL
+     */
+    fun start(seedUrl: String) = start(listOf(seedUrl))
 
     /**
      * Starts the Krawler with the URL provided. This method will call `onCrawlStart()`
@@ -268,7 +326,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 			// This is where we'll die bomb out if we don't receive an entry after some time
 			var timeoutCounter: Long = 0
     	    while(entries.isEmpty) {
-			    if (timeoutCounter++ == config.emptyQueueWaitTime) {
+			    if (config.shutdownOnEmptyQueue && timeoutCounter++ == config.emptyQueueWaitTime) {
 				    logger.debug("Closing channel after timeout reached")
 				    channel.close()
                     job.cancel()
@@ -277,12 +335,12 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 				delay(1000)
 			}
 			
-		    val (url, parent, depth) = entries.receive()
+		    val (url, root, parent, depth) = entries.receive()
 
             val krawlUrl: KrawlUrl = KrawlUrl.new(url)
             val parentKrawlUrl: KrawlUrl = KrawlUrl.new(parent.url)
 
-            val action: KrawlAction  = fetch(krawlUrl, depth, parentKrawlUrl).await()
+            val action: KrawlAction  = fetch(krawlUrl, depth, parentKrawlUrl, root).await()
 
             if (action !is KrawlAction.Noop) {
 			    if (visitCount.getAndIncrement() >= config.totalPages && config.totalPages > 0) {
@@ -296,7 +354,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 		}
     }
 
-    internal fun fetch(krawlUrl: KrawlUrl, depth: Int, parent: KrawlUrl): Deferred<KrawlAction>
+    internal fun fetch(krawlUrl: KrawlUrl, depth: Int, parent: KrawlUrl, rootPageId: Int): Deferred<KrawlAction>
             = async(CommonPool + job) {
 
         // Make sure we're within depth limit
@@ -341,11 +399,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             // If there was an error parsing the response, still a content fetch error
             if (doc !is KrawlDocument) {
                 onContentFetchError(krawlUrl, "Krawler was unable to parse the response from the server.")
-                logger.debug("content fetch error2")
+                logger.debug("Content fetch error!")
                 return@async KrawlAction.Noop()
             }
 
-            val links = harvestLinks(doc, krawlUrl, history, depth)
+            val links = harvestLinks(doc, krawlUrl, history, depth, rootPageId)
             scheduledQueue.push(krawlUrl.domain, links)
 
             if (visit)
@@ -363,8 +421,10 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     internal suspend fun doCrawl(channel: ReceiveChannel<KrawlAction>) {
         channel.consumeEach { action ->
             when(action) {
-                is KrawlAction.Visit -> visit(action.krawlUrl, action.doc)
-                is KrawlAction.Check -> check(action.krawlUrl, action.statusCode)
+                is KrawlAction.Visit ->
+                    async(CommonPool + job) { visit(action.krawlUrl, action.doc) }.await()
+                is KrawlAction.Check ->
+                    async(CommonPool + job) { check(action.krawlUrl, action.statusCode) }.await()
             }
         }
     }
@@ -379,7 +439,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @return a list of [KrawlQueueEntry] containing the URLs to crawl
      */
     internal suspend fun harvestLinks(doc: KrawlDocument, url: KrawlUrl,
-                                      history: KrawlHistoryEntry, depth: Int): List<KrawlQueueEntry> {
+                                      history: KrawlHistoryEntry, depth: Int, rootPageId: Int): List<KrawlQueueEntry> {
 
         // Handle redirects by getting the location tag of the header and pushing that into the queue
         if (!config.useFastRedirectStrategy && doc.statusCode in redirectCodes && config.followRedirects) {
@@ -387,27 +447,30 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             val locStr: String = doc.headers["location"] ?: return listOf()
             val location: KrawlUrl = KrawlUrl.new(locStr, url)
 
-            // We won't count it as a visit sinc
+            // We won't count it as a visit since we didn't get any content
             visitCount.decrementAndGet()
 
-            return listOf(KrawlQueueEntry(location.canonicalForm, history, depth))
+            return listOf(KrawlQueueEntry(location.canonicalForm, rootPageId, history, depth))
         }
 
-        // If it wasn't a redirect  parse out the URLs from anchor tags and construct queue entries from them
+        // If it wasn't a redirect parse out the URLs from anchor tags and construct queue entries from them
         return listOf(
                 // Anchor tags
                 doc.anchorTags
                         .filterNot { it.attr("href").startsWith("#") }
                         .filter { it.attr("href").length <= 2048 }
                         .map { KrawlUrl.new(it.attr("href"), url) }
-                        .filter { it.canonicalForm.isNotBlank() }
-                        .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1) },
+                        .filter { it != InvalidKrawlUrl && it.canonicalForm.isNotBlank() }
+                        // TODO: Add in priority call?
+                        .map { KrawlQueueEntry(it.canonicalForm, rootPageId, history, depth + 1,
+                                assignQueuePriority(it, depth, history)) },
                 // Everything else (img tags, scripts, etc)d
                 doc.otherOutgoingLinks
                         .filterNot { it.startsWith("#")}
                         .filter { it.length <= 2048 }
                         .map { KrawlUrl.new(it, url) }
-                        .map { KrawlQueueEntry(it.canonicalForm, history, depth + 1)}
+                        .map { KrawlQueueEntry(it.canonicalForm, rootPageId, history, depth + 1,
+                                assignQueuePriority(it, depth, history))}
         ).flatten()
     }
 }
