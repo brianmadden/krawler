@@ -51,6 +51,7 @@ class KrawlerTest {
     val mockJob = Job()
     val mockMinder = mock<RoboMinderIf>()
     val mockContext = mock<HttpClientContext>()
+    val exampleQueueEntry = KrawlQueueEntry(exampleUrl.rawUrl, -1)
 
     val preparedResponse = KrawlDocument(exampleUrl,
             prepareResponse(200, "<html><head><title>Test</title></head><body>" +
@@ -67,19 +68,19 @@ class KrawlerTest {
 
         val capture: MutableList<String> = mutableListOf()
 
-        override fun shouldVisit(url: KrawlUrl): Boolean {
+        override fun shouldVisit(url: KrawlUrl, queueEntry: KrawlQueueEntry): Boolean {
             return true
         }
 
-        override fun shouldCheck(url: KrawlUrl): Boolean {
+        override fun shouldCheck(url: KrawlUrl, queueEntry: KrawlQueueEntry): Boolean {
             return false
         }
 
-        override fun visit(url: KrawlUrl, doc: KrawlDocument) {
+        override fun visit(url: KrawlUrl, doc: KrawlDocument, queueEntry: KrawlQueueEntry) {
             capture.add("VISIT - ${url.rawUrl}")
         }
 
-        override fun check(url: KrawlUrl, statusCode: Int) {
+        override fun check(url: KrawlUrl, statusCode: Int, queueEntry: KrawlQueueEntry) {
             capture.add("CHECK - ${url.rawUrl}")
         }
 
@@ -100,8 +101,8 @@ class KrawlerTest {
     @Test fun testDoCrawl() = runBlocking {
         val allThree = produce(CommonPool) {
             for (a in listOf(Krawler.KrawlAction.Noop(),
-                    Krawler.KrawlAction.Visit(exampleUrl, preparedResponse),
-                    Krawler.KrawlAction.Check(exampleUrl, preparedResponse.statusCode)))
+                    Krawler.KrawlAction.Visit(exampleUrl, preparedResponse, exampleQueueEntry),
+                    Krawler.KrawlAction.Check(exampleUrl, preparedResponse.statusCode, exampleQueueEntry)))
                 send(a)
         }
 

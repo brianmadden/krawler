@@ -35,6 +35,7 @@ import kotlinx.coroutines.experimental.channels.*
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import java.time.LocalDateTime
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -58,8 +59,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     private val logger: Logger = LogManager.getLogger()
 
     // Map of start URL -> int id to track branches of a crawl
-    private val rootPageIds: MutableMap<String, Int> = mutableMapOf()
-    // Current Max ID
+    private val rootPageIds: MutableMap<String, Int> = ConcurrentHashMap()
+    // Current Max root page ID
     private val maximumUsedId: AtomicInteger = AtomicInteger(0)
 
     init {
@@ -100,7 +101,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      *
      * @return boolean: true if we should visit, false otherwise
      */
-    abstract protected fun shouldVisit(url: KrawlUrl): Boolean
+    abstract protected fun shouldVisit(url: KrawlUrl, queueEntry: KrawlQueueEntry): Boolean
 
     /**
      * Override this function to determine if a URL should be checked.
@@ -111,14 +112,14 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      *
      * @return boolean: true if we should check, false otherwise
      */
-    open protected fun shouldCheck(url: KrawlUrl): Boolean = false
+    open protected fun shouldCheck(url: KrawlUrl, queueEntry: KrawlQueueEntry): Boolean = false
 
     /**
      * Visit a URL by issuing an HTTP GET request
      * @param url KrawlURL: The requested URL
      * @param doc KrawlDocument: The resulting document from visting the URL
      */
-    abstract protected fun visit(url: KrawlUrl, doc: KrawlDocument)
+    abstract protected fun visit(url: KrawlUrl, doc: KrawlDocument, queueEntry: KrawlQueueEntry)
 
     /**
      * Check a URL by issuing an HTTP HEAD request
@@ -127,7 +128,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @param url KrawlURL: The requested URL
      * @param statusCode Int: The resulting status code from checking the URL
      */
-    open protected fun check(url: KrawlUrl, statusCode: Int) {
+    open protected fun check(url: KrawlUrl, statusCode: Int, queueEntry: KrawlQueueEntry) {
         return
     }
 
@@ -312,8 +313,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      */
 
     internal sealed class KrawlAction {
-        data class Visit(val krawlUrl: KrawlUrl, val doc: KrawlDocument): KrawlAction()
-        data class Check(val krawlUrl: KrawlUrl, val statusCode: Int): KrawlAction()
+        data class Visit(val krawlUrl: KrawlUrl, val doc: KrawlDocument, val queueEntry: KrawlQueueEntry): KrawlAction()
+        data class Check(val krawlUrl: KrawlUrl, val statusCode: Int, val queueEntry: KrawlQueueEntry): KrawlAction()
         class Noop: KrawlAction()
     }
 
@@ -334,13 +335,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 				}
 				delay(1000)
 			}
-			
-		    val (url, root, parent, depth) = entries.receive()
 
-            val krawlUrl: KrawlUrl = KrawlUrl.new(url)
-            val parentKrawlUrl: KrawlUrl = KrawlUrl.new(parent.url)
-
-            val action: KrawlAction  = fetch(krawlUrl, depth, parentKrawlUrl, root).await()
+            val queueEntry = entries.receive()
+            val action: KrawlAction  = fetch(queueEntry).await()
 
             if (action !is KrawlAction.Noop) {
 			    if (visitCount.getAndIncrement() >= config.totalPages && config.totalPages > 0) {
@@ -354,8 +351,13 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 		}
     }
 
-    internal fun fetch(krawlUrl: KrawlUrl, depth: Int, parent: KrawlUrl, rootPageId: Int): Deferred<KrawlAction>
+    internal fun fetch(queueEntry: KrawlQueueEntry): Deferred<KrawlAction>
             = async(CommonPool + job) {
+
+        val (url, rootPageId, _, depth) = queueEntry
+
+        val krawlUrl: KrawlUrl = KrawlUrl.new(url)
+        val parent: KrawlUrl = KrawlUrl.new(queueEntry.parent.url)
 
         // Make sure we're within depth limit
         if (depth >= config.maxDepth && config.maxDepth != -1) {
@@ -373,8 +375,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                     krawlHistory!!.insert(krawlUrl)
                 }
 
-        val visit = shouldVisit(krawlUrl)
-        val check = shouldCheck(krawlUrl)
+        val visit = shouldVisit(krawlUrl, queueEntry)
+        val check = shouldCheck(krawlUrl, queueEntry)
 
         if (visit || check) {
             // If we're respecting robots.txt check if it's ok to visit this page
@@ -407,9 +409,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             scheduledQueue.push(krawlUrl.domain, links)
 
             if (visit)
-                return@async KrawlAction.Visit(krawlUrl, doc)
+                return@async KrawlAction.Visit(krawlUrl, doc, queueEntry)
             else
-                return@async KrawlAction.Check(krawlUrl, doc.statusCode)
+                return@async KrawlAction.Check(krawlUrl, doc.statusCode, queueEntry)
         }
 
         return@async KrawlAction.Noop()
@@ -422,9 +424,13 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         channel.consumeEach { action ->
             when(action) {
                 is KrawlAction.Visit ->
-                    async(CommonPool + job) { visit(action.krawlUrl, action.doc) }.await()
+                    async(CommonPool + job) {
+                        visit(action.krawlUrl, action.doc, action.queueEntry)
+                    }.await()
                 is KrawlAction.Check ->
-                    async(CommonPool + job) { check(action.krawlUrl, action.statusCode) }.await()
+                    async(CommonPool + job) {
+                        check(action.krawlUrl, action.statusCode, action.queueEntry)
+                    }.await()
             }
         }
     }

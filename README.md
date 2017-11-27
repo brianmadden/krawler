@@ -6,10 +6,8 @@ About
 =====
 
 Krawler is a web crawling framework written in Kotlin. It is heavily inspired by
-[crawler4j](https://github.com/yasserg/crawler4j) by Yasser Ganjisaffar. The project 
-is still very new, and those looking for a mature, well tested crawler framework should
-likely still use crawler4j. For those who can tolerate a bit of turbulence, Krawler should serve as
-a replacement for crawler4j with minimal modifications to exisiting applications.
+[crawler4j](https://github.com/yasserg/crawler4j) by Yasser Ganjisaffar and should 
+look familiar to anyone who has used crawler4j before. 
  
 Some neat features and benefits of Krawler include:
 
@@ -24,7 +22,6 @@ many hosts in parallel are not effectively serialized by the politeness delay.
 poorly written websites, and thus less likely to error out during a crawl. The original HTML of the page is
 still available to facilitate validation and checking though.
 * Krawler collects full anchor tags including all attributes and anchor text.
-* Krawler currently has no proxy support, but it is on the roadmap. :(
 
 Gradle
 ======
@@ -38,7 +35,7 @@ to use Krawler in your project:
         maven { url "https://jitpack.io" }
    }
    dependencies {
-         compile 'com.github.brianmadden:krawler:0.4.3'
+         compile 'com.github.brianmadden:krawler:0.5.1'
    }
 
 ```
@@ -53,6 +50,15 @@ can be overridden to privde more robust behavior.
 
 The full code for this simple example can also be found in the [example project](https://github.com/brianmadden/krawler/tree/master/example/src/main/kotlin):
 ```kotlin
+import io.thelandscape.krawler.crawler.KrawlConfig
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueEntry
+import io.thelandscape.krawler.crawler.Krawler
+import io.thelandscape.krawler.http.KrawlDocument
+import io.thelandscape.krawler.http.KrawlUrl
+import java.time.LocalTime
+import java.util.concurrent.ConcurrentSkipListSet
+import java.util.concurrent.atomic.AtomicInteger
+
 class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
 
     private val FILTERS: Regex = Regex(".*(\\.(css|js|bmp|gif|jpe?g|png|tiff?|mid|mp2|mp3|mp4|wav|avi|" +
@@ -63,19 +69,19 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
      */
     val whitelist: MutableSet<String> = ConcurrentSkipListSet()
 
-    override fun shouldVisit(url: KrawlUrl): Boolean {
+    override fun shouldVisit(url: KrawlUrl, queueEntry: KrawlQueueEntry): Boolean {
         val withoutGetParams: String = url.canonicalForm.split("?").first()
         return (!FILTERS.matches(withoutGetParams) && url.host in whitelist)
     }
 
     private val counter: AtomicInteger = AtomicInteger(0)
 
-    override fun visit(url: KrawlUrl, doc: KrawlDocument) {
+    override fun visit(url: KrawlUrl, doc: KrawlDocument, queueEntry: KrawlQueueEntry) {
         println("${counter.incrementAndGet()}. Crawling ${url.canonicalForm}")
     }
 
     override fun onContentFetchError(url: KrawlUrl, reason: String) {
-        println("${counter.incrementAndGet()}. Tried to crawl ${url.canonicalForm} but failed to read the content.")
+        println("Tried to crawl ${url.canonicalForm} but failed to read the content.")
     }
 
     private var startTimestamp: Long = 0
@@ -98,6 +104,14 @@ Roadmap
 
 Release Notes
 =============
+**0.5.1 (2017-11-26)**
+Numbering this one 0.5.1 because last release should've been 0.5.0.
+
+- Made rootPageId tracking map threadsafe
+- Add `KrawlQueueEntries` to the `shouldVisit`, `shouldCheck`, `visit`, and `check` arguments list. This contains 
+  some useful information for tracking a crawl and making more informed decisions in the `override` methods.
+  
+
 **0.4.3 (2017-11-20)**
 - Added ability to clear crawl queues by RequestId and Age, see `Krawler#removeUrlsByRootPage` 
   and `Krawler#removeUrlsByAge`

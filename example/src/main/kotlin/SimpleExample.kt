@@ -17,6 +17,7 @@
  */
 
 import io.thelandscape.krawler.crawler.KrawlConfig
+import io.thelandscape.krawler.crawler.KrawlQueue.KrawlQueueEntry
 import io.thelandscape.krawler.crawler.Krawler
 import io.thelandscape.krawler.http.KrawlDocument
 import io.thelandscape.krawler.http.KrawlUrl
@@ -34,14 +35,14 @@ class SimpleExample(config: KrawlConfig = KrawlConfig()) : Krawler(config) {
      */
     val whitelist: MutableSet<String> = ConcurrentSkipListSet()
 
-    override fun shouldVisit(url: KrawlUrl): Boolean {
+    override fun shouldVisit(url: KrawlUrl, queueEntry: KrawlQueueEntry): Boolean {
         val withoutGetParams: String = url.canonicalForm.split("?").first()
         return (!FILTERS.matches(withoutGetParams) && url.host in whitelist)
     }
 
     private val counter: AtomicInteger = AtomicInteger(0)
 
-    override fun visit(url: KrawlUrl, doc: KrawlDocument) {
+    override fun visit(url: KrawlUrl, doc: KrawlDocument, queueEntry: KrawlQueueEntry) {
         println("${counter.incrementAndGet()}. Crawling ${url.canonicalForm}")
     }
 
