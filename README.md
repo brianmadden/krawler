@@ -110,6 +110,8 @@ Numbering this one 0.5.1 because last release should've been 0.5.0.
 - Made rootPageId tracking map threadsafe
 - Add `KrawlQueueEntries` to the `shouldVisit`, `shouldCheck`, `visit`, and `check` arguments list. This contains 
   some useful information for tracking a crawl and making more informed decisions in the `override` methods.
+- Made a read-only version of the `RootPageId` map visible (`Krawler#rootPageId`). This is the map used to track 
+  root URLs used to generate a crawl, and the value used in `KrawlQueueEntry#rootPageId`.
   
 
 **0.4.3 (2017-11-20)**

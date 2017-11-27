@@ -59,7 +59,11 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     private val logger: Logger = LogManager.getLogger()
 
     // Map of start URL -> int id to track branches of a crawl
-    private val rootPageIds: MutableMap<String, Int> = ConcurrentHashMap()
+    protected val rootPageIds: Map<String, Int>
+        get() = _rootPageIds.toMap()
+
+    // Map of start URL -> int id to track branches of a crawl
+    private val _rootPageIds: MutableMap<String, Int> = ConcurrentHashMap()
     // Current Max root page ID
     private val maximumUsedId: AtomicInteger = AtomicInteger(0)
 
@@ -206,7 +210,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
         krawlUrls.forEach {
             val rootPageId: Int = maximumUsedId.getAndIncrement()
-            rootPageIds[it.rawUrl] = rootPageId
+            _rootPageIds[it.rawUrl] = rootPageId
             scheduledQueue.push(it.domain, listOf(KrawlQueueEntry(it.canonicalForm, rootPageId, priority = priority)))
         }
     }
@@ -218,7 +222,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @return the number of entries removed from the queue
      */
     fun removeUrlsByRootPage(rootUrl: String): Int {
-        val id: Int = rootPageIds[rootUrl] ?: return 0
+        val id: Int = _rootPageIds[rootUrl] ?: return 0
 
         return scheduledQueue.deleteByRootPageId(id)
     }
@@ -246,7 +250,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
         krawlUrls.forEach {
             val rootPageId: Int = maximumUsedId.getAndIncrement()
-            rootPageIds[it.rawUrl] = rootPageId
+            _rootPageIds[it.rawUrl] = rootPageId
             scheduledQueue.push(it.domain, listOf(KrawlQueueEntry(it.canonicalForm, rootPageId)))
         }
 
