@@ -203,16 +203,26 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * URLs to the queue.
      *
      * @param url String: A URL to add to the queue
+     * @param priority Byte: A priority value from -128 to 127, where -128 is the highest priority
+     * @param beforeSchedule (KrawlQueueEntry) -> Unit: Function to run after a queue entry has been created but
+     * prior to the entry being pushed to the queue. This facilitates additional book keeping.
+     *
      * @return id of this root page in the rootPageUrl -> Id map
      */
-    fun submitUrl(url: String, priority: Byte = 0): Int {
-        // Convert all URLs to KrawlUrls
-        val url = KrawlUrl.new(url)
+    fun submitUrl(url: String, priority: Byte = 0,
+                  beforeSchedule: (KrawlQueueEntry) -> Unit = { _ -> }): Int {
 
+        // Convert URL to KrawlUrl so we can get the canonical form
+        val url = KrawlUrl.new(url)
 
         val rootPageId: Int = maximumUsedId.getAndIncrement()
         _rootPageIds[url.rawUrl] = rootPageId
-        scheduledQueue.push(url.domain, listOf(KrawlQueueEntry(url.canonicalForm, rootPageId, priority = priority)))
+
+        val queueEntry = KrawlQueueEntry(url.canonicalForm, rootPageId, priority = priority)
+
+        beforeSchedule(queueEntry)
+
+        scheduledQueue.push(url.domain, listOf(queueEntry))
 
         return rootPageId
     }
