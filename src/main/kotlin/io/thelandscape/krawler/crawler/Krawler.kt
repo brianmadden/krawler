@@ -199,20 +199,22 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     }
 
     /**
-     * Submits urls for crawling. This method can be called during an active crawl to add additional
+     * Submits url for crawling. This method can be called during an active crawl to add additional
      * URLs to the queue.
      *
-     * @param urls List<String>: A list of URLs to add to the queue
+     * @param url String: A URL to add to the queue
+     * @return id of this root page in the rootPageUrl -> Id map
      */
-    fun submitUrls(urls: List<String>, priority: Byte = 0) {
+    fun submitUrl(url: String, priority: Byte = 0): Int {
         // Convert all URLs to KrawlUrls
-        val krawlUrls: List<KrawlUrl> = urls.map { KrawlUrl.new(it) }
+        val url = KrawlUrl.new(url)
 
-        krawlUrls.forEach {
-            val rootPageId: Int = maximumUsedId.getAndIncrement()
-            _rootPageIds[it.rawUrl] = rootPageId
-            scheduledQueue.push(it.domain, listOf(KrawlQueueEntry(it.canonicalForm, rootPageId, priority = priority)))
-        }
+
+        val rootPageId: Int = maximumUsedId.getAndIncrement()
+        _rootPageIds[url.rawUrl] = rootPageId
+        scheduledQueue.push(url.domain, listOf(KrawlQueueEntry(url.canonicalForm, rootPageId, priority = priority)))
+
+        return rootPageId
     }
 
     /**
