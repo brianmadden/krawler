@@ -35,7 +35,7 @@ to use Krawler in your project:
         maven { url "https://jitpack.io" }
    }
    dependencies {
-         compile 'com.github.brianmadden:krawler:0.5.1'
+         compile 'com.github.brianmadden:krawler:0.5.2'
    }
 
 ```
@@ -104,6 +104,11 @@ Roadmap
 
 Release Notes
 =============
+**0.5.2 (2017-12-03)**
+- Add `override` method `Krawler#onEmptyQueueTimeout` that is called when queues have been empty for 
+  `KrawlConfig#emptyQueueWaitTime` seconds. This is called before shutting down if 
+  `KrawlConfig#shutdownOnEmptyQueue == true`.
+
 **0.5.1 (2017-11-26)**
 Numbering this one 0.5.1 because last release should've been 0.5.0.
 

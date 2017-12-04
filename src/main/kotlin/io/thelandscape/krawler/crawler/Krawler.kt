@@ -198,6 +198,13 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         return
     }
 
+    /** Function is called after all queues have been empty for at least KrawlConfig#emptyQueueWaitTime
+     * seconds. By default this method shuts down the crawler.
+     */
+    open protected fun onEmptyQueueTimeout() {
+        return
+    }
+
     /**
      * Submits url for crawling. This method can be called during an active crawl to add additional
      * URLs to the queue.
@@ -343,11 +350,15 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 			// This is where we'll die bomb out if we don't receive an entry after some time
 			var timeoutCounter: Long = 0
     	    while(entries.isEmpty) {
-			    if (config.shutdownOnEmptyQueue && timeoutCounter++ == config.emptyQueueWaitTime) {
-				    logger.debug("Closing channel after timeout reached")
-				    channel.close()
-                    job.cancel()
-                    return@produce
+			    if (timeoutCounter++ == config.emptyQueueWaitTime) {
+                    onEmptyQueueTimeout()
+
+                    if (config.shutdownOnEmptyQueue) {
+                        logger.debug("Closing channel after timeout reached")
+                        channel.close()
+                        job.cancel()
+                        return@produce
+                    }
 				}
 				delay(1000)
 			}
