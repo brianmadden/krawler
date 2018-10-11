@@ -26,21 +26,36 @@ still available to facilitate validation and checking though.
 * Krawler collects full anchor tags including all attributes and anchor text.
 * Krawler currently has no proxy support, but it is on the roadmap. :(
 
-Gradle
+Add Dependency
 ======
 Krawler is published through jitpack.io at: https://jitpack.io/#brianmadden/krawler/ . 
-Add jitpack.io as a repository, and krawler as a compile time dependency to your `build.gradle` 
-to use Krawler in your project:
+Add jitpack.io as a repository, and krawler as a dependency to use Krawler in your project:
 
-```groovy
- repositories {
-        jcenter()
-        maven { url "https://jitpack.io" }
-   }
-   dependencies {
-         compile 'com.github.brianmadden:krawler:0.4.3'
-   }
+#### Using Gradle
+```gradle
+repositories {
+    jcenter()
+    maven { url "https://jitpack.io" }
+}
 
+dependencies {
+    compile 'com.github.brianmadden:krawler:0.4.3'
+}
+```
+#### Using Maven
+```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
+<dependency>
+    <groupId>com.github.brianmadden</groupId>
+    <artifactId>krawler</artifactId>
+    <version>0.4.3</version>
+</dependency>
 ```
 
 Usage
