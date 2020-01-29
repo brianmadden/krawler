@@ -30,8 +30,11 @@ import io.thelandscape.krawler.http.*
 import io.thelandscape.krawler.robots.RoboMinder
 import io.thelandscape.krawler.robots.RoboMinderIf
 import io.thelandscape.krawler.robots.RobotsConfig
-import kotlinx.coroutines.experimental.*
-import kotlinx.coroutines.experimental.channels.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.consumeEach
+import kotlinx.coroutines.channels.produce
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import java.time.LocalDateTime
@@ -239,7 +242,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
      * @param: blocking [Boolean]: (default true) whether to block until completion or immediately return
      *
      */
-    fun start(seedUrl: List<String>, blocking: Boolean = true) = runBlocking(CommonPool) {
+    fun start(seedUrl: List<String>, blocking: Boolean = true) = runBlocking {
         // Convert all URLs to KrawlUrls
         val krawlUrls: List<KrawlUrl> = seedUrl.map { KrawlUrl.new(it) }
 
@@ -252,8 +255,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         onCrawlStart()
         val urls: Channel<KrawlQueueEntry> = scheduledQueue.krawlQueueEntryChannel
 		repeat(krawlQueues!!.size) {
-		    launch(CommonPool + job) {
-    		    val actions: ProducerJob<KrawlAction> = produceKrawlActions(urls)
+		    GlobalScope.launch(Dispatchers.Default) {
+    		    val actions: ReceiveChannel<KrawlAction> = produceKrawlActions(urls)
 	    		doCrawl(actions)
 			}
 		}
@@ -319,8 +322,8 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
     internal val visitCount: AtomicInteger = AtomicInteger(0)
 
-    internal suspend fun produceKrawlActions(entries: ReceiveChannel<KrawlQueueEntry>): ProducerJob<KrawlAction>
-            = produce(CommonPool + job) {
+    internal suspend fun produceKrawlActions(entries: ReceiveChannel<KrawlQueueEntry>): ReceiveChannel<KrawlAction>
+            = GlobalScope.produce(Dispatchers.Default) {
 
 		while(true) {
 			// This is where we'll die bomb out if we don't receive an entry after some time
@@ -334,7 +337,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 				}
 				delay(1000)
 			}
-			
+
 		    val (url, root, parent, depth) = entries.receive()
 
             val krawlUrl: KrawlUrl = KrawlUrl.new(url)
@@ -349,13 +352,13 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 					return@produce
                 }
 			}
-			
+
             send(action)
 		}
     }
 
     internal fun fetch(krawlUrl: KrawlUrl, depth: Int, parent: KrawlUrl, rootPageId: Int): Deferred<KrawlAction>
-            = async(CommonPool + job) {
+            = GlobalScope.async(Dispatchers.Default) {
 
         // Make sure we're within depth limit
         if (depth >= config.maxDepth && config.maxDepth != -1) {
@@ -422,9 +425,9 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         channel.consumeEach { action ->
             when(action) {
                 is KrawlAction.Visit ->
-                    async(CommonPool + job) { visit(action.krawlUrl, action.doc) }.await()
+                    withContext(Dispatchers.Default) { visit(action.krawlUrl, action.doc) }
                 is KrawlAction.Check ->
-                    async(CommonPool + job) { check(action.krawlUrl, action.statusCode) }.await()
+                    withContext(Dispatchers.Default) { check(action.krawlUrl, action.statusCode) }
             }
         }
     }
