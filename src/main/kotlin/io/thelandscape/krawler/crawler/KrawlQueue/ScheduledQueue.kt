@@ -22,8 +22,8 @@ import com.google.common.cache.CacheBuilder
 import com.google.common.cache.CacheLoader
 import com.google.common.cache.LoadingCache
 import io.thelandscape.krawler.crawler.KrawlConfig
-import kotlinx.coroutines.experimental.*
-import kotlinx.coroutines.experimental.channels.Channel
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import java.time.LocalDateTime
@@ -39,12 +39,12 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>,
 
 	init {
 	    repeat(queues.size) {
-            launch(CommonPool + jobContext) {
+            GlobalScope.launch(Dispatchers.Default) {
 			    pop(it)
 			}
-        }	
+        }
 	}
-	
+
     private var pushSelector: Int = 0
 
     private val pushAffinityCache: LoadingCache<String, Int> = CacheBuilder.newBuilder()
@@ -84,13 +84,13 @@ class ScheduledQueue(private val queues: List<KrawlQueueIf>,
             logger.debug("Popping w/ queue selector: $index")
 
 			var entry: KrawlQueueEntry? = queues[index].pop()
-			
+
 			while (entry == null) {
 				logger.debug("Delaying queue:$index for 1000...")
                 delay(1000)
                 entry = queues[index].pop()
             }
-            
+
             krawlQueueEntryChannel.send(entry)
         }
     }
