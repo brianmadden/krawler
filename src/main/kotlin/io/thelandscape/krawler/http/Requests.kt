@@ -20,11 +20,8 @@ package io.thelandscape.krawler.http
 
 import io.thelandscape.krawler.crawler.KrawlConfig
 import io.thelandscape.krawler.robots.RobotsTxt
-import kotlinx.coroutines.experimental.CommonPool
-import kotlinx.coroutines.experimental.Deferred
-import kotlinx.coroutines.experimental.async
-import kotlinx.coroutines.experimental.delay
-import kotlinx.coroutines.experimental.sync.Mutex
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
 import org.apache.http.HttpRequest
 import org.apache.http.HttpResponse
 import org.apache.http.client.config.CookieSpecs
@@ -161,7 +158,7 @@ class Requests(private val krawlConfig: KrawlConfig,
     private fun asyncMakeRequest(url: KrawlUrl,
                                  reqFun: (String) -> HttpUriRequest,
                                  retFun: (KrawlUrl, HttpResponse, HttpClientContext) -> RequestResponse)
-            : Deferred<RequestResponse> = async(CommonPool) {
+            : Deferred<RequestResponse> = GlobalScope.async(Dispatchers.Default) {
 
         val httpContext = HttpClientContext()
         httpContext.setAttribute("fullRedirectHistory", listOf<RedirectHistoryNode>())
@@ -178,7 +175,7 @@ class Requests(private val krawlConfig: KrawlConfig,
                 val reqDelta = Instant.now().toEpochMilli() - requestTracker.getTimestamp(host)
                 if (reqDelta >= 0 && reqDelta < krawlConfig.politenessDelay) {
 				    // Sleep until the remainder of the politeness delay has elapsed
-					logger.debug("Sleeping for ${krawlConfig.politenessDelay - reqDelta} ms for politeness.")					
+					logger.debug("Sleeping for ${krawlConfig.politenessDelay - reqDelta} ms for politeness.")
                     delay(krawlConfig.politenessDelay - reqDelta)
 				}
                 // Set last request time for politeness
