@@ -18,15 +18,14 @@ package io.thelandscape
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import com.nhaarman.mockito_kotlin.MockitoKotlin
-import com.nhaarman.mockito_kotlin.mock
-import com.nhaarman.mockito_kotlin.verify
+import com.nhaarman.mockitokotlin2.mock
+import com.nhaarman.mockitokotlin2.verify
 import io.thelandscape.krawler.http.ErrorResponse
 import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestProviderIf
 import io.thelandscape.krawler.http.RequestResponse
 import io.thelandscape.krawler.robots.RoboMinder
-import kotlinx.coroutines.experimental.runBlocking
+import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -41,7 +40,7 @@ class RoboMinderTest {
     val minder = RoboMinder("AGENT-A", mockRequests)
 
     init {
-        MockitoKotlin.registerInstanceCreator { KrawlUrl.new("") }
+        // MockitoKotlin.registerInstanceCreator { KrawlUrl.new("") }
     }
 
     @Test fun testFetch() = runBlocking<Unit> {

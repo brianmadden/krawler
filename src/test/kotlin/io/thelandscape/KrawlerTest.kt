@@ -18,8 +18,7 @@ package io.thelandscape
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import com.nhaarman.mockito_kotlin.MockitoKotlin
-import com.nhaarman.mockito_kotlin.mock
+import com.nhaarman.mockitokotlin2.mock
 import io.thelandscape.krawler.crawler.History.KrawlHistoryEntry
 import io.thelandscape.krawler.crawler.History.KrawlHistoryIf
 import io.thelandscape.krawler.crawler.KrawlConfig
@@ -31,10 +30,11 @@ import io.thelandscape.krawler.http.KrawlUrl
 import io.thelandscape.krawler.http.RequestProviderIf
 import io.thelandscape.krawler.robots.RoboMinderIf
 import io.thelandscape.krawler.robots.RobotsConfig
-import kotlinx.coroutines.experimental.CommonPool
-import kotlinx.coroutines.experimental.Job
-import kotlinx.coroutines.experimental.channels.produce
-import kotlinx.coroutines.experimental.runBlocking
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.produce
+import kotlinx.coroutines.runBlocking
 import org.apache.http.client.protocol.HttpClientContext
 import org.junit.Before
 import org.junit.Test
@@ -88,7 +88,7 @@ class KrawlerTest {
     val testKrawler = testCrawler(mockConfig, mockHistory, mockQueue, null, mockRequests, mockJob)
 
     @Before fun setUp() {
-        MockitoKotlin.registerInstanceCreator { KrawlUrl.new("") }
+        // Mockito.registerInstanceCreator { KrawlUrl.new("") }
         testKrawler.minder = mockMinder
         testKrawler.capture.clear()
     }
@@ -98,7 +98,7 @@ class KrawlerTest {
      */
 
     @Test fun testDoCrawl() = runBlocking {
-        val allThree = produce(CommonPool) {
+        val allThree = GlobalScope.produce(Dispatchers.Default) {
             for (a in listOf(Krawler.KrawlAction.Noop(),
                     Krawler.KrawlAction.Visit(exampleUrl, preparedResponse),
                     Krawler.KrawlAction.Check(exampleUrl, preparedResponse.statusCode)))
