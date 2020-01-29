@@ -39,7 +39,7 @@ repositories {
 }
 
 dependencies {
-    compile 'com.github.brianmadden:krawler:0.4.3'
+    compile 'com.github.brianmadden:krawler:0.4.4'
 }
 ```
 #### Using Maven
@@ -54,7 +54,7 @@ dependencies {
 <dependency>
     <groupId>com.github.brianmadden</groupId>
     <artifactId>krawler</artifactId>
-    <version>0.4.3</version>
+    <version>0.4.4</version>
 </dependency>
 ```
 
@@ -113,6 +113,11 @@ Roadmap
 
 Release Notes
 =============
+**0.4.4 (2020-1-29)**
+- Upgrade Kotlin to 1.3.61
+- Upgrade `kotlinx.coroutines`. This required an update to some of the places where coroutine builders were called internally.
+- Upgrade Gradle wrapper
+
 **0.4.3 (2017-11-20)**
 - Added ability to clear crawl queues by RequestId and Age, see `Krawler#removeUrlsByRootPage` 
   and `Krawler#removeUrlsByAge`
