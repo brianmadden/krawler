@@ -458,22 +458,26 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
         // If it wasn't a redirect parse out the URLs from anchor tags and construct queue entries from them
         return listOf(
-                // Anchor tags
-                doc.anchorTags
-                        .filterNot { it.attr("href").startsWith("#") }
-                        .filter { it.attr("href").length <= 2048 }
-                        .map { KrawlUrl.new(it.attr("href"), url) }
-                        .filter { it != InvalidKrawlUrl && it.canonicalForm.isNotBlank() }
-                        // TODO: Add in priority call?
-                        .map { KrawlQueueEntry(it.canonicalForm, rootPageId, history, depth + 1,
-                                assignQueuePriority(it, depth, history)) },
-                // Everything else (img tags, scripts, etc)d
-                doc.otherOutgoingLinks
-                        .filterNot { it.startsWith("#")}
-                        .filter { it.length <= 2048 }
-                        .map { KrawlUrl.new(it, url) }
-                        .map { KrawlQueueEntry(it.canonicalForm, rootPageId, history, depth + 1,
-                                assignQueuePriority(it, depth, history))}
+            // Anchor tags
+            doc.anchorTags
+                .asSequence()
+                .filterNot { it.attr("href").startsWith("#") }
+                .filter { it.attr("href").length <= 2048 }
+                .map { KrawlUrl.new(it.attr("href"), url) }
+                .filter { it != InvalidKrawlUrl && it.canonicalForm.isNotBlank() }
+                // TODO: Add in priority call?
+                .map { KrawlQueueEntry(it.canonicalForm, rootPageId, history, depth + 1,
+                    assignQueuePriority(it, depth, history)) }
+                .toList(),
+            // Everything else (img tags, scripts, etc)
+            doc.otherOutgoingLinks
+                .asSequence()
+                .filterNot { it.startsWith("#")}
+                .filter { it.length <= 2048 }
+                .map { KrawlUrl.new(it, url) }
+                .map { KrawlQueueEntry(it.canonicalForm, rootPageId, history, depth + 1,
+                    assignQueuePriority(it, depth, history))}
+                .toList()
         ).flatten()
     }
 }
