@@ -99,7 +99,7 @@ class KrawlerTest {
 
     @Test fun testDoCrawl() = runBlocking {
         val allThree = GlobalScope.produce(Dispatchers.Default) {
-            for (a in listOf(Krawler.KrawlAction.Noop(),
+            for (a in listOf(Krawler.KrawlAction.Noop,
                     Krawler.KrawlAction.Visit(exampleUrl, preparedResponse),
                     Krawler.KrawlAction.Check(exampleUrl, preparedResponse.statusCode)))
                 send(a)
