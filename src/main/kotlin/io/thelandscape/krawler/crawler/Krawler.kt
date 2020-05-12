@@ -317,7 +317,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     internal sealed class KrawlAction {
         data class Visit(val krawlUrl: KrawlUrl, val doc: KrawlDocument): KrawlAction()
         data class Check(val krawlUrl: KrawlUrl, val statusCode: Int): KrawlAction()
-        class Noop: KrawlAction()
+        object Noop : KrawlAction()
     }
 
     internal val visitCount: AtomicInteger = AtomicInteger(0)
@@ -363,7 +363,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         // Make sure we're within depth limit
         if (depth >= config.maxDepth && config.maxDepth != -1) {
             logger.debug("Max depth!")
-            return@async KrawlAction.Noop()
+            return@async KrawlAction.Noop
         }
 
         // Do a history check
@@ -371,7 +371,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 if (krawlHistory!!.hasBeenSeen(krawlUrl)) { // If it has been seen
                     onRepeatVisit(krawlUrl, parent)
                     logger.debug("History says no")
-                    return@async KrawlAction.Noop()
+                    return@async KrawlAction.Noop
                 } else {
                     krawlHistory!!.insert(krawlUrl)
                 }
@@ -383,7 +383,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             // If we're respecting robots.txt check if it's ok to visit this page
             if (config.respectRobotsTxt && !minder.isSafeToVisit(krawlUrl)) {
                 logger.debug("Robots says no")
-                return@async KrawlAction.Noop()
+                return@async KrawlAction.Noop
             }
 
             val doc: RequestResponse = if (visit) {
@@ -396,14 +396,14 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
             if (doc is ErrorResponse) {
                 onContentFetchError(krawlUrl, doc.reason)
                 logger.debug("Content fetch error!")
-                return@async KrawlAction.Noop()
+                return@async KrawlAction.Noop
             }
 
             // If there was an error parsing the response, still a content fetch error
             if (doc !is KrawlDocument) {
                 onContentFetchError(krawlUrl, "Krawler was unable to parse the response from the server.")
                 logger.debug("Content fetch error!")
-                return@async KrawlAction.Noop()
+                return@async KrawlAction.Noop
             }
 
             val links = harvestLinks(doc, krawlUrl, history, depth, rootPageId)
@@ -415,7 +415,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
                 return@async KrawlAction.Check(krawlUrl, doc.statusCode)
         }
 
-        return@async KrawlAction.Noop()
+        return@async KrawlAction.Noop
     }
 
     // Set of redirect codes
@@ -458,22 +458,26 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
         // If it wasn't a redirect parse out the URLs from anchor tags and construct queue entries from them
         return listOf(
-                // Anchor tags
-                doc.anchorTags
-                        .filterNot { it.attr("href").startsWith("#") }
-                        .filter { it.attr("href").length <= 2048 }
-                        .map { KrawlUrl.new(it.attr("href"), url) }
-                        .filter { it != InvalidKrawlUrl && it.canonicalForm.isNotBlank() }
-                        // TODO: Add in priority call?
-                        .map { KrawlQueueEntry(it.canonicalForm, rootPageId, history, depth + 1,
-                                assignQueuePriority(it, depth, history)) },
-                // Everything else (img tags, scripts, etc)d
-                doc.otherOutgoingLinks
-                        .filterNot { it.startsWith("#")}
-                        .filter { it.length <= 2048 }
-                        .map { KrawlUrl.new(it, url) }
-                        .map { KrawlQueueEntry(it.canonicalForm, rootPageId, history, depth + 1,
-                                assignQueuePriority(it, depth, history))}
+            // Anchor tags
+            doc.anchorTags
+                .asSequence()
+                .filterNot { it.attr("href").startsWith("#") }
+                .filter { it.attr("href").length <= 2048 }
+                .map { KrawlUrl.new(it.attr("href"), url) }
+                .filter { it != InvalidKrawlUrl && it.canonicalForm.isNotBlank() }
+                // TODO: Add in priority call?
+                .map { KrawlQueueEntry(it.canonicalForm, rootPageId, history, depth + 1,
+                    assignQueuePriority(it, depth, history)) }
+                .toList(),
+            // Everything else (img tags, scripts, etc)
+            doc.otherOutgoingLinks
+                .asSequence()
+                .filterNot { it.startsWith("#")}
+                .filter { it.length <= 2048 }
+                .map { KrawlUrl.new(it, url) }
+                .map { KrawlQueueEntry(it.canonicalForm, rootPageId, history, depth + 1,
+                    assignQueuePriority(it, depth, history))}
+                .toList()
         ).flatten()
     }
 }
