@@ -52,13 +52,15 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  */
 abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
-                       private var krawlHistory: KrawlHistoryIf? = null,
-                       private var krawlQueues: List<KrawlQueueIf>? = null,
+                       krawlHistory: KrawlHistoryIf? = null,
+                       krawlQueues: List<KrawlQueueIf>? = null,
                        robotsConfig: RobotsConfig? = null,
                        private val requestProvider: RequestProviderIf = Requests(config),
                        private val job: Job = Job()) {
 
     private val logger: Logger = LogManager.getLogger()
+    private val krawlHistory: KrawlHistoryIf
+    private val krawlQueues: List<KrawlQueueIf>
 
     // Map of start URL -> int id to track branches of a crawl
     private val rootPageIds: MutableMap<String, Int> = mutableMapOf()
@@ -66,21 +68,22 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
     private val maximumUsedId: AtomicInteger = AtomicInteger(0)
 
     init {
-        if (krawlHistory == null || krawlQueues == null) {
+        this.krawlHistory = if (krawlHistory == null) {
             val hsqlConnection = HSQLConnection(config.persistentCrawl, config.crawlDirectory)
+            KrawlHistoryHSQLDao(hsqlConnection.hsqlSession)
+        } else {
+            krawlHistory
+        }
 
-            if (krawlHistory == null)
-                krawlHistory = KrawlHistoryHSQLDao(hsqlConnection.hsqlSession)
-
+        this.krawlQueues = if (krawlQueues == null) {
             // This is safe because we don't have any KrawlHistoryIf implementations other than HSQL
-            val histDao: KrawlHistoryHSQLDao = krawlHistory as KrawlHistoryHSQLDao
-
-            if (krawlQueues == null)
-                // TODO: Dynamic number of queues? Why 10?
-                krawlQueues = (0 until 10).map {
-                    KrawlQueueHSQLDao("queue$it", hsqlConnection.hsqlSession, histDao)
-                }
-
+            val histDao: KrawlHistoryHSQLDao = this.krawlHistory as KrawlHistoryHSQLDao
+            // TODO: Dynamic number of queues? Why 10?
+            (0 until 10).map {
+                KrawlQueueHSQLDao("queue$it", this.krawlHistory.session, histDao)
+            }
+        } else {
+            krawlQueues
         }
 
         job.invokeOnCompletion {
@@ -89,7 +92,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
         }
     }
 
-    private val scheduledQueue: ScheduledQueue = ScheduledQueue(krawlQueues!!, config, job)
+    private val scheduledQueue: ScheduledQueue = ScheduledQueue(this.krawlQueues, config, job)
 
     /**
      * Handle robots.txt
@@ -254,7 +257,7 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
         onCrawlStart()
         val urls: Channel<KrawlQueueEntry> = scheduledQueue.krawlQueueEntryChannel
-		repeat(krawlQueues!!.size) {
+		repeat(krawlQueues.size) {
 		    GlobalScope.launch(Dispatchers.Default) {
     		    val actions: ReceiveChannel<KrawlAction> = produceKrawlActions(urls)
 	    		doCrawl(actions)
@@ -368,12 +371,12 @@ abstract class Krawler(val config: KrawlConfig = KrawlConfig(),
 
         // Do a history check
         val history: KrawlHistoryEntry =
-                if (krawlHistory!!.hasBeenSeen(krawlUrl)) { // If it has been seen
+                if (krawlHistory.hasBeenSeen(krawlUrl)) { // If it has been seen
                     onRepeatVisit(krawlUrl, parent)
                     logger.debug("History says no")
                     return@async KrawlAction.Noop
                 } else {
-                    krawlHistory!!.insert(krawlUrl)
+                    krawlHistory.insert(krawlUrl)
                 }
 
         val visit = shouldVisit(krawlUrl)

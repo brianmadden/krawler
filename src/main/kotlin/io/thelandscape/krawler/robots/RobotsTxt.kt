@@ -28,8 +28,7 @@ class RobotsTxt(url: KrawlUrl, response: HttpResponse, context: HttpClientContex
 
     // TODO: Improve handling: https://en.wikipedia.org/wiki/Robots_exclusion_standard#About_the_standard
 
-    var disallowRules: Map<String, MutableSet<String>> = mapOf()
-        private set
+    val disallowRules: Map<String, MutableSet<String>>
 
     // Do all the parsing in a single pass in here
     init {
@@ -47,14 +46,12 @@ class RobotsTxt(url: KrawlUrl, response: HttpResponse, context: HttpClientContex
             if (key == "user-agent") {
                 userAgent = value
                 continue
-            }
-
-            if (key == "disallow") {
-                if (userAgent in rules)
-                    rules[userAgent]!!.add(value)
-                else
+            } else if (key == "disallow") {
+                if (userAgent in rules) {
+                    rules.getOrPut(userAgent, { mutableSetOf() }).add(value)
+                } else {
                     rules[userAgent] = mutableSetOf(value)
-
+                }
                 continue
             }
         }
