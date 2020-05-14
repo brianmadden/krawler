@@ -61,7 +61,7 @@ class KrawlQueueDaoTest {
                 KrawlQueueEntry("http://www.e5.com/", 0, KrawlHistoryEntry(), timestamp = LocalDateTime.now())
         )
         queueDao.push(pushers)
-        val res = queueDao.deleteByAge(LocalDateTime.now())
-        assertEquals(5, res)
+        val res = queueDao.deleteByAge(LocalDateTime.now().minusDays(1))
+        assertEquals(2, res)
     }
 }
