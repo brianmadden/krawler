@@ -90,6 +90,7 @@ class RoboMinder(private val userAgent: String,
             rules.put(url.hierarchicalPart, process(resp))
         }
 
-        return rules.getIfPresent(url.hierarchicalPart)!!.invoke(withoutGetParams)
+        val rule = rules.getIfPresent(url.hierarchicalPart) ?: return true
+        return rule(withoutGetParams)
     }
 }

@@ -80,13 +80,15 @@ internal class HistoryTrackingRedirectStrategy: DefaultRedirectStrategy() {
 private val pcm: PoolingHttpClientConnectionManager = PoolingHttpClientConnectionManager()
 
 class Requests(private val krawlConfig: KrawlConfig,
-               private var httpClient: CloseableHttpClient? = null) : RequestProviderIf {
+               httpClient: CloseableHttpClient? = null) : RequestProviderIf {
 
 	private val logger: Logger = LogManager.getLogger()
+    private val httpClient: CloseableHttpClient
 
     init {
-        if (httpClient == null) {
-            val requestConfig = RequestConfig.custom()
+        this.httpClient =
+            if (httpClient == null) {
+                val requestConfig = RequestConfig.custom()
                     .setCookieSpec(CookieSpecs.STANDARD)
                     .setExpectContinueEnabled(false)
                     .setContentCompressionEnabled(krawlConfig.allowContentCompression)
@@ -96,15 +98,15 @@ class Requests(private val krawlConfig: KrawlConfig,
                     .setSocketTimeout(krawlConfig.socketTimeout)
                     .build()
 
-            val trustStrat = TrustStrategy { _: Array<X509Certificate>, _: String -> true }
+                val trustStrat = TrustStrategy { _: Array<X509Certificate>, _: String -> true }
 
-            val sslContext = SSLContextBuilder.create()
+                val sslContext = SSLContextBuilder.create()
                     .loadTrustMaterial(null, trustStrat)
                     .build()
 
-            val redirectStrategy = HistoryTrackingRedirectStrategy()
+                val redirectStrategy = HistoryTrackingRedirectStrategy()
 
-            httpClient = HttpClients.custom()
+                HttpClients.custom()
                     .setDefaultRequestConfig(requestConfig)
                     .setSSLContext(sslContext)
                     .setSSLHostnameVerifier(NoopHostnameVerifier())
@@ -112,7 +114,9 @@ class Requests(private val krawlConfig: KrawlConfig,
                     .setUserAgent(krawlConfig.userAgent)
                     .setConnectionManager(pcm)
                     .build()
-        }
+            } else {
+                httpClient
+            }
     }
 
     /** Fetch the robots.txt file from a domain
@@ -186,7 +190,7 @@ class Requests(private val krawlConfig: KrawlConfig,
         }
 
         val resp: RequestResponse = try {
-            val response: HttpResponse? = httpClient!!.execute(req, httpContext)
+            val response: HttpResponse? = httpClient.execute(req, httpContext)
             if (response == null) ErrorResponse(url) else retFun(url, response, httpContext)
         } catch (e: Throwable) {
             ErrorResponse(url, e.toString())
