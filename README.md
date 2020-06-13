@@ -42,6 +42,17 @@ dependencies {
     compile 'com.github.brianmadden:krawler:0.4.4'
 }
 ```
+#### Using Gradle Kotlin Script
+```gradle
+repositories {
+    jcenter()
+    maven("https://jitpack.io")
+}
+dependencies {
+    implementation("com.github.brianmadden:krawler:0.4.4
+}
+```
+
 #### Using Maven
 ```xml
 <repositories>
