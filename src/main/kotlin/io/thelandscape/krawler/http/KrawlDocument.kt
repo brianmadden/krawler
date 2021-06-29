@@ -28,6 +28,7 @@ import org.jsoup.nodes.Element
 import org.jsoup.select.Elements
 import java.io.ByteArrayInputStream
 import javax.xml.parsers.DocumentBuilderFactory
+import java.nio.charset.StandardCharsets
 
 interface RequestResponse
 
@@ -53,7 +54,7 @@ class KrawlDocument(val url: KrawlUrl, response: HttpResponse, context: HttpClie
     /**
      * Raw HTML
      */
-    val rawHtml: String = try { EntityUtils.toString(response.entity) ?: "" } catch (e: Throwable) { "" }
+    val rawHtml: String = try { EntityUtils.toString(response.entity, StandardCharsets.UTF_8) ?: "" } catch (e: Throwable) { "" }
 
     /**
      * Status code
